@@ -47,6 +47,14 @@ static bool s_button_held = false;
 static AppTimer *s_pulse_timer;
 static uint8_t s_pulse_step;
 static bool s_main_visible;
+static Layer *s_weight_animation_layer;
+static AppTimer *s_weight_animation_timer;
+static int s_history_offset = 0;
+static int s_incoming_offset = 0;
+static int s_slide_frame = 0;
+static bool s_slide_running = false;
+static char s_old_weight_text[24];
+static char s_new_weight_text[24];
 
 // One 2.5-second sweep every 5 seconds, with a short pause between waves.
 #define PULSE_FRAME_MS 65
@@ -111,6 +119,63 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   }
 }
 
+// Two independent weight captions slide through a clipped display window.
+static void format_history_weight(int offset, char *out, size_t len) {
+  double value = get_chart_history_weight(offset);
+  if (value <= 0) {
+    snprintf(out, len, "--");
+    return;
+  }
+  char number[16];
+  double_str(to_current_unit(value), number, sizeof(number) - 1);
+  snprintf(out, len, "%s%s", number, get_short_unit_name());
+}
+
+static void weight_slide_draw(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  const int height = bounds.size.h;
+  graphics_context_set_text_color(ctx, FOREGROUND);
+  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+  if (!s_slide_running) {
+    graphics_draw_text(ctx, s_new_weight_text, font, bounds,
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+    return;
+  }
+  int travel = (height * s_slide_frame) / 8;
+  graphics_draw_text(ctx, s_old_weight_text, font,
+                     GRect(0, -travel, bounds.size.w, height),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  graphics_draw_text(ctx, s_new_weight_text, font,
+                     GRect(0, height - travel, bounds.size.w, height),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
+static void slide_tick(void *context) {
+  s_weight_animation_timer = NULL;
+  if (!s_slide_running || !s_weight_animation_layer) return;
+  ++s_slide_frame;
+  layer_mark_dirty(s_weight_animation_layer);
+  if (s_slide_frame < 8) {
+    s_weight_animation_timer = app_timer_register(35, slide_tick, NULL);
+  } else {
+    s_slide_running = false;
+    s_history_offset = s_incoming_offset;
+    layer_mark_dirty(s_weight_animation_layer);
+  }
+}
+
+static void change_history(int direction) {
+  if (s_slide_running) return;
+  int target = s_history_offset + direction;
+  if (target < 0 || target >= get_chart_history_count()) return;
+  snprintf(s_old_weight_text, sizeof(s_old_weight_text), "%s", s_new_weight_text);
+  s_incoming_offset = target;
+  format_history_weight(target, s_new_weight_text, sizeof(s_new_weight_text));
+  s_slide_running = true;
+  s_slide_frame = 0;
+  s_weight_animation_timer = app_timer_register(35, slide_tick, NULL);
+}
+
 static void initialise_ui(void) {
   s_window = window_create();
   window_set_background_color(s_window, BACKGROUND);
@@ -147,7 +212,11 @@ static void initialise_ui(void) {
   text_layer_set_text_color(s_textlayer_1, FOREGROUND);
   text_layer_set_text_alignment(s_textlayer_1, GTextAlignmentCenter);
   text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
-  layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_1);
+  // Clip the old/new animated weights to the caption area.
+  s_weight_animation_layer = layer_create(layer_get_frame(text_layer_get_layer(s_textlayer_1)));
+  layer_set_clips(s_weight_animation_layer, true);
+  layer_set_update_proc(s_weight_animation_layer, weight_slide_draw);
+  layer_add_child(window_get_root_layer(s_window), s_weight_animation_layer);
 
   // Lower right button indicator: center 36px above bottom, as in Swiss Chronograph.
   s_button_marker = layer_create(GRect(bounds.size.w - 36, 0, 36, bounds.size.h));
@@ -169,6 +238,11 @@ static void destroy_ui(void) {
     s_button_anim_timer = NULL;
   }
   layer_destroy(s_button_marker);
+  if (s_weight_animation_timer) {
+    app_timer_cancel(s_weight_animation_timer);
+    s_weight_animation_timer = NULL;
+  }
+  layer_destroy(s_weight_animation_layer);
   text_layer_destroy(s_textlayer_1);
 }
 
@@ -179,8 +253,10 @@ static void wakeup_handler(/* WakeupId id, int32_t reason */) {
 void display_info(void) {
   text_layer_set_text(s_textlayer_2,
                       get_chart_days() == 30 ? "Last 30 days" : "Last 15 days");
-  // Temporary fixed preview caption while demo chart is enabled.
-  text_layer_set_text(s_textlayer_1, "112kg");
+  if (!s_slide_running) {
+    format_history_weight(s_history_offset, s_new_weight_text, sizeof(s_new_weight_text));
+    if (s_weight_animation_layer) layer_mark_dirty(s_weight_animation_layer);
+  }
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -208,9 +284,9 @@ static void button_anim_tick(void *context) {
     s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
   } else {
     s_active_button = -1;
-    if (i == 0) show_settings();
-    else if (i == 1) show_input();
-    else show_details();
+    if (i == 0) change_history(-1);
+    else if (i == 1) show_details();
+    else change_history(1);
   }
 }
 
@@ -269,6 +345,9 @@ static void show_main(void) {
   for (int i = 0; i < 3; ++i) s_button_width[i] = 5;
   s_active_button = -1;
   s_button_held = false;
+  s_history_offset = 0;
+  s_slide_running = false;
+  s_slide_frame = 0;
   s_pulse_step = 0;
   set_chart_pulse_step(0);
   initialise_ui();
