@@ -88,9 +88,9 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
     // A travelling, gently brighter wave, retaining the original density fade.
     int distance = x - pulse_center;
     if (distance < 0) distance = -distance;
-    if (distance < 25) {
-      int pulse = ((25 - distance) * 24) / 25;
-      density += (pulse * (64 - density)) / 64;
+    if (distance < 34) {
+      int pulse = ((34 - distance) * 36) / 34;
+      density += (pulse * (64 - density)) / 48;
     }
 
     for (int fill_y = y + 1; fill_y <= baseline; fill_y += 2) {
