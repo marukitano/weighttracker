@@ -1,249 +1,147 @@
 #include <pebble.h>
+#include <math.h>
 #include "../support/config.h"
 #include "../support/utils.h"
 #include "../support/draw.h"
 #include "../support/data.h"
 #include "../support/parameters.h"
 
-#define PATTERN1_LENGTH 6
-#define PATTERN2_LENGTH 4
-#define DIVIDER_COUNT 7
+// Time 2 chart: the retro Bayer dither is adapted from OpenLibreLinkUp.
+// The fill grows denser from left (older) to right (newer), with no min/max labels.
+#define CHART_LEFT 9
+#define CHART_TOP 7
+#define CHART_RIGHT 7
+#define CHART_BOTTOM 25
+#define TICK_SHORT 2
+#define TICK_LONG 4
 
-// Chart geometry is calculated from the chart layer, not a fixed 144x110 box.
-// Original layout: origin (28,9), plotting area 100x70.
-static int s_origo_x = 28;
-static int s_origo_y = 9;
-static int s_plot_height = 70;
-static int s_plot_width = 100;
-#define ORIGO_X s_origo_x
-#define ORIGO_Y s_origo_y
-#define HEIGHT s_plot_height
-#define WIDTH s_plot_width
-#define RIGHT_MARGIN 7
-#define ARROW_LENGTH 5
-#define ARROW_WIDTH 2
-#define MARKER_LENGTH 2
-#define LONG_MARKER_LENGTH 4
+static double s_multiplier = 1.0;
 
-static double s_multiplier = 0;
+static const uint8_t DITHER_8X8[8][8] = {
+  { 0, 32, 8, 40, 2, 34, 10, 42 },
+  { 48, 16, 56, 24, 50, 18, 58, 26 },
+  { 12, 44, 4, 36, 14, 46, 6, 38 },
+  { 60, 28, 52, 20, 62, 30, 54, 22 },
+  { 3, 35, 11, 43, 1, 33, 9, 41 },
+  { 51, 19, 59, 27, 49, 17, 57, 25 },
+  { 15, 47, 7, 39, 13, 45, 5, 37 }
+};
 
-static const bool PATTERN1[PATTERN1_LENGTH] = { 0, 0, 0, 1, 1, 1 };
-static const bool PATTERN2[PATTERN2_LENGTH] = { 0, 0, 0, 1 };
-
-static const int DIVIDERS[DIVIDER_COUNT] = {1, 2, 5, 10, 20, 50, 100};
-
-void set_multiplier(double m) {
-  s_multiplier = m;
+void set_multiplier(double multiplier) {
+  s_multiplier = multiplier;
 }
 
-int calculate_divider(int min, int max) {
-  int i, j, d, lower, upper;
-  int diff = max - min;
+static int chart_y(double value, double minimum, double maximum, int top, int height) {
+  if (maximum <= minimum) {
+    return top + height / 2;
+  }
+  double fraction = (value - minimum) / (maximum - minimum);
+  if (fraction < 0) fraction = 0;
+  if (fraction > 1) fraction = 1;
+  return top + height - (int)(fraction * height * s_multiplier);
+}
 
-  for (i = 0; i < DIVIDER_COUNT; i++) {
-    for (j = 2; j < 4; j++) {
-      if (diff < j * DIVIDERS[i]) {
-        d = DIVIDERS[i];
-        lower = (min / d) * d;
-        upper = (max / d) * d;
+static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
+                                   int baseline, int left, int width) {
+  if (end.x <= start.x || width <= 0) return;
 
-        if (upper < max) {
-          upper++;
-        }
+  graphics_context_set_fill_color(ctx, CHARTCOLOR);
 
-        if ((upper - lower) / d < 4) {
-          return d;
-        }
+  // Logical 2x2 pixels and Bayer thresholds match the original Gluco style.
+  for (int x = start.x; x <= end.x; x += 2) {
+    int y = start.y + (int)((int32_t)(end.y - start.y) * (x - start.x) /
+                             (end.x - start.x));
+    int density = 1 + (x - left) * 63 / width;
+    if (density > 64) density = 64;
+    if (density < 1) density = 1;
+
+    for (int fill_y = y + 2; fill_y <= baseline; fill_y += 2) {
+      if (DITHER_8X8[(fill_y / 2) & 7][(x / 2) & 7] < density) {
+        graphics_fill_rect(ctx, GRect(x, fill_y, 2, 2), 0, GCornerNone);
       }
-    }
-  }
-
-  return DIVIDERS[DIVIDER_COUNT - 1];
-}
-
-void draw_horizontal_pattern(GContext *ctx, const int start, const int end, const int y, const bool* pattern, const int plen, GColor stroke) {
-  int i;
-
-  graphics_context_set_stroke_color(ctx, stroke);
-
-  for (i = start; i <= end; i++) {
-    if (pattern[i % plen]) {
-      graphics_draw_pixel(ctx, GPoint(i, y));
-    }
-  }
-}
-
-void draw_axis(GContext *ctx, int lower, int upper, int mark, double step) {
-  int i, y;
-  static char buffer[] = "100";
-  GRect frame = GRect(0, 0, 23, 16);
-
-  graphics_context_set_stroke_color(ctx, FOREGROUND);
-  graphics_context_set_text_color(ctx, FOREGROUND);
-
-  for (i = lower; i <= upper; i += mark) {
-    y = ORIGO_Y + HEIGHT - (int)(step * (double)(i - lower));
-    frame.origin.y = y - 9;
-    snprintf(buffer, sizeof("100"), "%d", i);
-
-    graphics_draw_text(ctx,
-      buffer,
-      fonts_get_system_font(FONT_KEY_GOTHIC_14),
-      frame,
-      GTextOverflowModeTrailingEllipsis,
-      GTextAlignmentRight,
-      NULL
-    );
-
-    graphics_draw_line(ctx, GPoint(ORIGO_X - MARKER_LENGTH, y), GPoint(ORIGO_X, y));
-
-    if (i > lower) {
-      draw_horizontal_pattern(ctx, ORIGO_X, ORIGO_X + WIDTH + RIGHT_MARGIN, y, PATTERN2, PATTERN2_LENGTH, FOREGROUND);
     }
   }
 }
 
 void draw_chart_callback(Layer *layer, GContext *ctx) {
-  int i, imin, imax, y, drawflag, mark, lower, upper;
-  int cwd;
-  bool longtick;
-  double div, min, max, step, w;
-  GPoint sp, ep;
+  GRect bounds = layer_get_bounds(layer);
+  const int num_days = get_num_of_days();
+  const int left = CHART_LEFT;
+  const int right = bounds.size.w - CHART_RIGHT;
+  const int top = CHART_TOP;
+  const int baseline = bounds.size.h - CHART_BOTTOM;
+  const int height = baseline - top;
+  const int width = right - left;
 
-  const GRect bounds = layer_get_bounds(layer);
-  s_plot_width = bounds.size.w - ORIGO_X - RIGHT_MARGIN - 9;
-  s_plot_height = bounds.size.h - ORIGO_Y - 31;
-
-  const int num_of_days = get_num_of_days();
-
-  div = (double)WIDTH / (double)num_of_days;
+  if (num_days <= 0 || height <= 0 || width <= 0) return;
 
   graphics_context_set_stroke_color(ctx, FOREGROUND);
-  graphics_context_set_fill_color(ctx, FOREGROUND);
   graphics_context_set_text_color(ctx, FOREGROUND);
+  graphics_draw_line(ctx, GPoint(left, baseline), GPoint(right, baseline));
 
-  // draw axis
-  graphics_draw_line(ctx, GPoint(ORIGO_X, 0), GPoint(ORIGO_X, ORIGO_Y + HEIGHT));
-  graphics_draw_line(ctx, GPoint(ORIGO_X, ORIGO_Y + HEIGHT), GPoint(ORIGO_X + WIDTH + RIGHT_MARGIN, ORIGO_Y + HEIGHT));
-
-  // draw tickmarks on horizontal axis
-  graphics_draw_line(ctx, GPoint(ORIGO_X, ORIGO_Y + HEIGHT), GPoint(ORIGO_X, ORIGO_Y + HEIGHT + MARKER_LENGTH));
-
-  cwd = get_week_day();
-
-  for (i = num_of_days - 1; i >= 0; i--) {
-    longtick = (i == num_of_days - 1) || (cwd == (is_monday_first() ? 0 : 6)); // MONDAY = 0, SUNDAY = 6
-
-    graphics_draw_line(ctx,
-      GPoint(ORIGO_X + (int)(div * i), ORIGO_Y + HEIGHT),
-      GPoint(ORIGO_X + (int)(div * i), ORIGO_Y + HEIGHT + (longtick ? LONG_MARKER_LENGTH : MARKER_LENGTH)));
-
-    if (longtick && i < num_of_days - 1) {
-      graphics_draw_text(ctx,
-        (is_monday_first() ? "M" : "S"),
-        fonts_get_system_font(FONT_KEY_GOTHIC_14),
-        GRect(ORIGO_X + (int)(div * i) - 7, ORIGO_Y + HEIGHT + LONG_MARKER_LENGTH, 16, 16),
-        GTextOverflowModeTrailingEllipsis,
-        GTextAlignmentCenter,
-        NULL
-      );
+  int weekday = get_week_day();
+  for (int i = num_days - 1; i >= 0; --i) {
+    bool weekly = (i == num_days - 1) ||
+                  (weekday == (is_monday_first() ? 0 : 6));
+    int x = left + (int)((int32_t)width * i / (num_days - 1 > 0 ? num_days - 1 : 1));
+    graphics_draw_line(ctx, GPoint(x, baseline),
+                       GPoint(x, baseline + (weekly ? TICK_LONG : TICK_SHORT)));
+    if (weekly && i < num_days - 1) {
+      graphics_draw_text(ctx, is_monday_first() ? "M" : "S",
+                         fonts_get_system_font(FONT_KEY_GOTHIC_14),
+                         GRect(x - 8, baseline + 4, 16, 17),
+                         GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
     }
-
-    cwd = (cwd + 6) % 7;
+    weekday = (weekday + 6) % 7;
   }
+  graphics_draw_text(ctx, "T", fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
+                     GRect(right - 8, baseline + 4, 16, 17),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
-  graphics_draw_text(ctx,
-    "T",
-    fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
-    GRect(ORIGO_X + WIDTH - (int)div - 8, ORIGO_Y + HEIGHT + LONG_MARKER_LENGTH, 16, 16),
-    GTextOverflowModeTrailingEllipsis,
-    GTextAlignmentCenter,
-    NULL
-  );
-
-  // draw arrow heads
-  graphics_draw_line(ctx, GPoint(ORIGO_X, 0), GPoint(ORIGO_X - ARROW_WIDTH, ARROW_LENGTH));
-  graphics_draw_line(ctx, GPoint(ORIGO_X, 0), GPoint(ORIGO_X + ARROW_WIDTH, ARROW_LENGTH));
-
-  // draw arrow heads
-  graphics_draw_line(ctx, GPoint(ORIGO_X + WIDTH + RIGHT_MARGIN, ORIGO_Y + HEIGHT), GPoint(ORIGO_X + WIDTH + RIGHT_MARGIN - ARROW_LENGTH, ORIGO_Y + HEIGHT - ARROW_WIDTH));
-  graphics_draw_line(ctx, GPoint(ORIGO_X + WIDTH + RIGHT_MARGIN, ORIGO_Y + HEIGHT), GPoint(ORIGO_X + WIDTH + RIGHT_MARGIN - ARROW_LENGTH, ORIGO_Y + HEIGHT + ARROW_WIDTH));
-
- // calculate and draw axis
-  min = to_current_unit(get_latest_weight());
-  max = to_current_unit(get_latest_weight());
-
-  for (i = 0; i < num_of_days; i++) {
-    w = to_current_unit(get_weight(i));
-
-    if (get_measured(i)) {
-      if (min < 0.0 || min > w) {
-        min = w;
-      }
-
-      if (max < 0.0 || max < w) {
-        max = w;
-      }
+  bool found = false;
+  double min_weight = 0;
+  double max_weight = 0;
+  for (int i = 0; i < num_days; ++i) {
+    if (!get_measured(i)) continue;
+    double value = to_current_unit(get_weight(i));
+    if (!found) {
+      min_weight = max_weight = value;
+      found = true;
+    } else {
+      if (value < min_weight) min_weight = value;
+      if (value > max_weight) max_weight = value;
     }
   }
+  if (!found) return;
 
-  max = ceil(max);
-  min = floor(min);
+  // Padding keeps flat or near-flat weight histories legible.
+  double spread = max_weight - min_weight;
+  double pad = spread > 0 ? spread * 0.2 : 1.0;
+  min_weight -= pad;
+  max_weight += pad;
 
-  if (min == max) {
-    min = min - 1;
+  GPoint points[32];
+  int count = 0;
+  for (int i = 0; i < num_days && count < 32; ++i) {
+    if (!get_measured(i)) continue;
+    int x = left + (int)((int32_t)width * i / (num_days - 1 > 0 ? num_days - 1 : 1));
+    points[count++] = GPoint(x, chart_y(to_current_unit(get_weight(i)),
+                                         min_weight, max_weight, top, height));
+  }
+  if (count == 0) return;
+
+  // Dither FIRST so the continuous curve remains crisp above the fill.
+  for (int i = 1; i < count; ++i) {
+    draw_dithered_segment(ctx, points[i - 1], points[i], baseline, left, width);
   }
 
-  imax = (int)max;
-  imin = (int)min;
-
-  mark = calculate_divider(imin, imax);
-  lower = (imin / mark) * mark;
-  upper = (imax / mark) * mark;
-
-  if (upper < imax) {
-    upper += mark;
-  }
-
-  step = (double)HEIGHT / (upper - lower);
-
-  draw_axis(ctx, lower, upper, mark, step);
-
-  // draw the curve
   graphics_context_set_stroke_color(ctx, CHARTCOLOR);
+  graphics_context_set_stroke_width(ctx, 2);
+  for (int i = 1; i < count; ++i) {
+    graphics_draw_line(ctx, points[i - 1], points[i]);
+  }
   graphics_context_set_fill_color(ctx, CHARTCOLOR);
-
-  drawflag = 0;
-
-  w = -1.0;
-
-  if (get_measured(0)) {
-    w = to_current_unit(get_weight(0));
-    sp = GPoint(ORIGO_X, ORIGO_Y + HEIGHT - (int)((w - (double)lower) * step * s_multiplier));
-    graphics_fill_circle(ctx, sp, 2);
-    drawflag = 1;
-  }
-
-  for (i = 1; i < num_of_days; i++) {
-    if (get_measured(i)) {
-      w = to_current_unit(get_weight(i));
-      ep = GPoint(ORIGO_X + (int)(div * i), ORIGO_Y + HEIGHT - (int)((w - (double)lower) * step * s_multiplier));
-
-      if (drawflag) {
-        graphics_draw_line(ctx, sp, ep);
-      } else {
-        draw_horizontal_pattern(ctx, ORIGO_X, ep.x, ep.y, PATTERN1, PATTERN1_LENGTH, CHARTCOLOR);
-        drawflag = 1;
-      }
-
-      graphics_fill_circle(ctx, ep, 2);
-
-      sp = ep;
-    }
-  }
-
-  if (drawflag) {
-    y = ORIGO_Y + HEIGHT - (int)((w - (double)lower) * step * s_multiplier);
-    draw_horizontal_pattern(ctx, sp.x, ORIGO_X + WIDTH + RIGHT_MARGIN, y, PATTERN1, PATTERN1_LENGTH, CHARTCOLOR);
+  for (int i = 0; i < count; ++i) {
+    graphics_fill_circle(ctx, points[i], 2);
   }
 }
