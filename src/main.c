@@ -43,13 +43,27 @@ static AppTimer *s_pulse_timer;
 static uint8_t s_pulse_step;
 static bool s_main_visible;
 
+// One 2.5-second sweep every 5 seconds, with a short pause between waves.
+#define PULSE_FRAME_MS 65
+#define PULSE_STEPS 40
+#define PULSE_PERIOD_MS 5000
+
 static void pulse_timer_callback(void *context) {
   s_pulse_timer = NULL;
   if (!s_main_visible) return;
-  s_pulse_step = (s_pulse_step + 1) % 40;
+
+  uint32_t next_delay;
+  if (s_pulse_step == PULSE_STEPS - 1) {
+    s_pulse_step = 0;
+    next_delay = PULSE_PERIOD_MS - (PULSE_STEPS - 1) * PULSE_FRAME_MS;
+  } else {
+    s_pulse_step++;
+    next_delay = PULSE_FRAME_MS;
+  }
+
   set_chart_pulse_step(s_pulse_step);
   if (s_chart) layer_mark_dirty(s_chart);
-  s_pulse_timer = app_timer_register(125, pulse_timer_callback, NULL);
+  s_pulse_timer = app_timer_register(next_delay, pulse_timer_callback, NULL);
 }
 
 
@@ -174,7 +188,7 @@ static void handle_window_unload(Window* window) {
 
 static void handle_window_appear(Window* window) {
   s_main_visible = true;
-  if (!s_pulse_timer) s_pulse_timer = app_timer_register(125, pulse_timer_callback, NULL);
+  if (!s_pulse_timer) s_pulse_timer = app_timer_register(PULSE_FRAME_MS, pulse_timer_callback, NULL);
   display_info();
 }
 
