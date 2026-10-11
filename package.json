@@ -1,0 +1,55 @@
+{
+  "name": "weighttracker-pebble-time-2",
+  "version": "1.2.0",
+  "description": "WeightTracker for Pebble watches, including Pebble Time 2",
+  "author": "Viktor Csala; Pebble Time 2 adaptation by marukitano",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "keywords": [
+    "pebble-app",
+    "weight-tracker"
+  ],
+  "dependencies": {},
+  "pebble": {
+    "displayName": "WeightTracker",
+    "uuid": "7151ed69-3204-4914-8aaa-860e1494a504",
+    "sdkVersion": "4",
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "emery"
+    ],
+    "enableMultiJS": false,
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": {
+      "PIN_DATE": 1,
+      "PIN_TIME": 2,
+      "PIN_ID": 3,
+      "PIN_COMMAND": 4,
+      "PIN_TYPE": 5,
+      "PIN_WEIGHT": 6
+    },
+    "resources": {
+      "media": [
+        {
+          "file": "images/action_bar_icon_up.png",
+          "name": "ACTION_BAR_UP",
+          "type": "bitmap"
+        },
+        {
+          "file": "images/action_bar_icon_down.png",
+          "name": "ACTION_BAR_DOWN",
+          "type": "bitmap"
+        },
+        {
+          "file": "images/action_bar_icon_check.png",
+          "name": "ACTION_BAR_CHECK",
+          "type": "bitmap"
+        }
+      ]
+    }
+  }
+}
