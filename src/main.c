@@ -98,7 +98,7 @@ static void wakeup_handler(/* WakeupId id, int32_t reason */) {
 void display_info(void) {
   static char date[16];
   static char weight[11];
-  static char info[31];
+  static char info[64];
   uint32_t cdt = get_latest_date();
 
   if (has_used_already() && cdt > 0) {
