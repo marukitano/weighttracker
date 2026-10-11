@@ -17,6 +17,11 @@
 #define FORCE_DEMO_CHART 1
 static double s_multiplier = 1.0;
 static uint8_t s_pulse_step = 0;
+static int s_selected_history_offset = 0;
+
+void set_chart_selected_history_offset(int offset) {
+  s_selected_history_offset = offset < 0 ? 0 : offset;
+}
 
 void set_chart_pulse_step(uint8_t step) {
   s_pulse_step = step % 40;
@@ -196,6 +201,17 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   }
   if (count == 0) return;
 
+  // Selected measurement position, including interpolated 30-day demo view.
+  int selected = count - 1 - s_selected_history_offset;
+  if (demo) {
+    int demo_index = 14 - s_selected_history_offset;
+    if (demo_index < 0) demo_index = 0;
+    if (demo_index > 14) demo_index = 14;
+    selected = (demo_index * (num_days - 1) + 7) / 14;
+  }
+  if (selected < 0) selected = 0;
+  if (selected >= count) selected = count - 1;
+
   // Dither FIRST so the continuous curve remains crisp above the fill.
   for (int i = 1; i < count; ++i) {
     draw_dithered_segment(ctx, points[i - 1], points[i], fill_bottom, left, width);
@@ -205,5 +221,18 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 2);
   for (int i = 1; i < count; ++i) {
     graphics_draw_line(ctx, points[i - 1], points[i]);
+  }
+
+  // Downward-pointing equilateral triangle, tip 2px above selected point.
+  // Horizontal scanlines give a filled, pixel-perfect marker on Pebble.
+  const GPoint marker = points[selected];
+  const int tip_y = marker.y - 2;
+  graphics_context_set_stroke_color(ctx, FOREGROUND);
+  graphics_context_set_stroke_width(ctx, 1);
+  for (int row = 0; row <= 10; ++row) {
+    int half_width = ((10 - row) * 6 + 5) / 10;
+    graphics_draw_line(ctx,
+                       GPoint(marker.x - half_width, tip_y - 10 + row),
+                       GPoint(marker.x + half_width, tip_y - 10 + row));
   }
 }
