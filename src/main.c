@@ -79,6 +79,16 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   graphics_fill_rect(ctx, GRect(bounds.size.w - s_button_width, 0,
                                 s_button_width, bounds.size.h),
                      5, GCornersLeft);
+  // Three horizontal lines indicate the measurement list on the lower key.
+  graphics_context_set_stroke_color(ctx, FOREGROUND);
+  graphics_context_set_stroke_width(ctx, 2);
+  const int icon_right = bounds.size.w - 14;
+  const int icon_left = icon_right - 13;
+  const int center_y = bounds.size.h / 2;
+  for (int offset = -6; offset <= 6; offset += 6) {
+    graphics_draw_line(ctx, GPoint(icon_left, center_y + offset),
+                       GPoint(icon_right, center_y + offset));
+  }
 }
 
 static void initialise_ui(void) {
@@ -120,8 +130,8 @@ static void initialise_ui(void) {
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_1);
 
   // Lower right button indicator: center 36px above bottom, as in Swiss Chronograph.
-  s_button_marker = layer_create(GRect(bounds.size.w - 7,
-                                       bounds.size.h - 36 - 26, 7, 52));
+  s_button_marker = layer_create(GRect(bounds.size.w - 36,
+                                       bounds.size.h - 36 - 26, 36, 52));
   layer_set_update_proc(s_button_marker, button_marker_update);
   layer_add_child(window_get_root_layer(s_window), s_button_marker);
 
