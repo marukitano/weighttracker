@@ -25,10 +25,10 @@
 #define WT_CURRENT_VERSION 1.2
 
 // global variables
-static int s_chart_days = 14;
+static int s_chart_days = 15;
 int get_chart_days(void) { return s_chart_days; }
 void toggle_chart_days(void) {
-  s_chart_days = s_chart_days == 14 ? 30 : 14;
+  s_chart_days = s_chart_days == 15 ? 30 : 15;
   persist_write_int(CHART_RANGE_KEY, s_chart_days);
 }
 static double s_current_weight;
@@ -142,7 +142,7 @@ void load_data(void) {
 
   init_settings(unit, format, fday);
   s_chart_days = persist_exists(CHART_RANGE_KEY) &&
-                 persist_read_int(CHART_RANGE_KEY) == 30 ? 30 : 14;
+                 persist_read_int(CHART_RANGE_KEY) == 30 ? 30 : 15;
 
   if (persist_exists(REMINDER_FLAG_KEY)) {
     hr = persist_read_int(REMINDER_FLAG_KEY);
