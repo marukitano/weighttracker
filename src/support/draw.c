@@ -62,9 +62,11 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
                                   int baseline, int left, int width) {
   if (end.x <= start.x || width <= 0) return;
 
-  int fill_start_x = left + width / 4;
-  int fill_width = left + width - fill_start_x;
-  int solid_start = (fill_width * 70) / 100;
+  // Spread the original Bayer gradient over the entire plot width.
+  // No empty first quarter and no early fully-solid final third.
+  int fill_start_x = left;
+  int fill_width = width;
+  int solid_start = fill_width;
   int pulse_center = left + width + 32 - ((width + 64) * s_pulse_step) / 39;
 
   graphics_context_set_fill_color(ctx, CHARTCOLOR);
