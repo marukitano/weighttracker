@@ -31,6 +31,16 @@ static const double DEMO_WEIGHTS[15] = {
   106.9, 103.2, 107.4, 104.8, 109.1
 };
 
+// Match the displayed header to the temporary preview curve.
+double get_chart_display_weight(void) {
+#if FORCE_DEMO_CHART
+  return DEMO_WEIGHTS[14];
+#else
+  return get_latest_weight();
+#endif
+}
+
+
 static const uint8_t DITHER_8X8[8][8] = {
   { 0, 32, 8, 40, 2, 34, 10, 42 },
   { 48, 16, 56, 24, 50, 18, 58, 26 },
@@ -163,20 +173,6 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
       if (value > max_weight) max_weight = value;
     }
   }
-
-  // Show the latest plotted weight in the former DEMO label position.
-  // The temporary demo plot uses its rightmost (today's) sample.
-  static char current_weight_text[16];
-  const double displayed_weight = demo
-      ? DEMO_WEIGHTS[num_days - 1 < 15 ? num_days - 1 : 14]
-      : get_latest_weight();
-  double_str(to_current_unit(displayed_weight), current_weight_text,
-             sizeof(current_weight_text) - 1);
-  // Preserve the original DEMO font and position; display just the number.
-  graphics_draw_text(ctx, current_weight_text,
-                     fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
-                     GRect(right - 48, top, 46, 18),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
 
   // Padding keeps flat or near-flat weight histories legible.
   double spread = max_weight - min_weight;
