@@ -6,3 +6,6 @@ void set_multiplier(double m);
 void set_chart_pulse_step(uint8_t step);
 
 double get_chart_display_weight(void);
+
+int get_chart_history_count(void);
+double get_chart_history_weight(int offset);
