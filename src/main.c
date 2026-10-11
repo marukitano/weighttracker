@@ -55,12 +55,23 @@ static void initialise_ui(void) {
   text_layer_set_font(s_textlayer_2, fonts_get_system_font(PBL_IF_ROUND_ELSE(FONT_KEY_GOTHIC_14_BOLD, FONT_KEY_GOTHIC_24_BOLD)));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_2);
 
+  // The Time 2 (emery) has a 200x228 display. Give its chart the full
+  // available width and height while retaining the original layout elsewhere.
+  // draw_chart_callback derives its geometry from these layer bounds.
   // s_chart
+#ifdef PBL_PLATFORM_EMERY
+  s_chart = layer_create(GRect(0, 40, bounds.size.w, bounds.size.h - 74));
+#else
   s_chart = layer_create(GRect(PBL_IF_ROUND_ELSE((bounds.size.w - 144) / 2 - 4, 0), 40, 144, 110));
+#endif
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_chart);
 
   // s_textlayer_1
+#ifdef PBL_PLATFORM_EMERY
+  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 34, bounds.size.w, 30));
+#else
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
+#endif
   text_layer_set_background_color(s_textlayer_1, GColorClear);
   text_layer_set_text_color(s_textlayer_1, FOREGROUND);
   text_layer_set_text_alignment(s_textlayer_1, GTextAlignmentCenter);
