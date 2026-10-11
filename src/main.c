@@ -143,7 +143,8 @@ static void weight_slide_draw(Layer *layer, GContext *ctx) {
   // Cut the number out of the chart fill: paint only black glyph pixels,
   // without an opaque background rectangle.
   graphics_context_set_text_color(ctx, GColorBlack);
-  GFont font = fonts_get_system_font(FONT_KEY_ROBOTO_BOLD_SUBSET_49);
+  // Roboto Bold Subset 49 excludes the decimal point; Bitham supports it.
+  GFont font = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
   if (!s_slide_running) {
     graphics_draw_text(ctx, s_new_weight_text, font, bounds,
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
