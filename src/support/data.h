@@ -33,3 +33,6 @@ void show_versions(void);
 #else
 #define LOG_VERSION()
 #endif
+
+int get_chart_days(void);
+void toggle_chart_days(void);
