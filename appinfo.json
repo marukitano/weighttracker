@@ -35,7 +35,7 @@
     "sdkVersion": "3",
     "shortName": "WeightTracker",
     "targetPlatforms": [
-        "basalt", "aplite", "chalk"
+        "basalt", "aplite", "chalk", "emery"
     ],
     "uuid": "7151ed69-3204-4914-8aaa-860e1494a504",
     "versionLabel": "1.2",
