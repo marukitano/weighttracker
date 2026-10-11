@@ -105,19 +105,19 @@ static void initialise_ui(void) {
 
   // s_textlayer_1
 #ifdef PBL_PLATFORM_EMERY
-  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 42, bounds.size.w, 30));
+  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 42, bounds.size.w, 36));
 #else
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
 #endif
   text_layer_set_background_color(s_textlayer_1, GColorClear);
   text_layer_set_text_color(s_textlayer_1, FOREGROUND);
   text_layer_set_text_alignment(s_textlayer_1, GTextAlignmentCenter);
-  text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_1);
 
   // Right-side physical button indicator, vertically centred.
   s_button_marker = layer_create(GRect(bounds.size.w - 5,
-                                       (bounds.size.h - 52) / 2, 5, 52));
+                                       (bounds.size.h * 3 / 4) - 26, 5, 52));
   layer_set_update_proc(s_button_marker, button_marker_update);
   layer_add_child(window_get_root_layer(s_window), s_button_marker);
 
@@ -198,6 +198,7 @@ static void handle_window_appear(Window* window) {
   s_main_visible = true;
   if (!s_pulse_timer) s_pulse_timer = app_timer_register(PULSE_FRAME_MS, pulse_timer_callback, NULL);
   display_info();
+  if (s_chart) layer_mark_dirty(s_chart);
 }
 
 static void show_main(void) {
