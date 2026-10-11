@@ -9,3 +9,5 @@ double get_chart_display_weight(void);
 
 int get_chart_history_count(void);
 double get_chart_history_weight(int offset);
+
+void set_chart_selected_history_offset(int offset);
