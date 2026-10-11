@@ -11,7 +11,7 @@
 #define CHART_LEFT 9
 #define CHART_TOP 7
 #define CHART_RIGHT 7
-#define CHART_BOTTOM 25
+#define CHART_BOTTOM 35
 #define TICK_SHORT 2
 #define TICK_LONG 4
 
@@ -121,6 +121,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   const int right = bounds.size.w - CHART_RIGHT;
   const int top = CHART_TOP;
   const int baseline = bounds.size.h - CHART_BOTTOM;
+  // Fixed plot height: always map the recorded weight range into this space.
   const int height = baseline - top;
   const int width = right - left;
 
