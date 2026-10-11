@@ -12,8 +12,6 @@
 #define CHART_TOP -8
 #define CHART_RIGHT 7
 #define CHART_BOTTOM 45
-#define TICK_SHORT 2
-#define TICK_LONG 4
 
 // Temporary preview: draw sample measurements without saving them.
 #define FORCE_DEMO_CHART 1
@@ -116,7 +114,9 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
 
 void draw_chart_callback(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  const int num_days = get_num_of_days();
+  const int num_days = get_chart_days();
+  const int total_days = get_num_of_days();
+  const int first_day = total_days - num_days;
   const int left = CHART_LEFT;
   const int right = bounds.size.w - CHART_RIGHT;
   const int top = CHART_TOP;
@@ -127,28 +127,19 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
 
   if (num_days <= 0 || height <= 0 || width <= 0) return;
 
-  graphics_context_set_stroke_color(ctx, FOREGROUND);
+  // No X-axis or tick marks: the range is shown as plain text.
   graphics_context_set_text_color(ctx, FOREGROUND);
-  graphics_draw_line(ctx, GPoint(left, baseline), GPoint(right, baseline));
-
-  // Fixed 14-day labels: oldest at left, middle at day 7, today at right.
-  const int tick_x[3] = {left, left + width / 2, right};
-  const char *tick_labels[3] = {"14", "7", "1"};
-  for (int i = 0; i < 3; ++i) {
-    graphics_draw_line(ctx, GPoint(tick_x[i], baseline),
-                       GPoint(tick_x[i], baseline + TICK_LONG));
-    graphics_draw_text(ctx, tick_labels[i],
-                       fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-                       GRect(tick_x[i] - 18, baseline + 4, 36, 29),
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-  }
+  graphics_draw_text(ctx, get_chart_days() == 30 ? "Last 30 days" : "Last 14 days",
+                     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+                     GRect(left, baseline + 2, width, 24),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   bool found = false;
   double min_weight = 0;
   double max_weight = 0;
   for (int i = 0; i < num_days; ++i) {
-    if (!get_measured(i)) continue;
-    double value = to_current_unit(get_weight(i));
+    if (!get_measured(first_day + i)) continue;
+    double value = to_current_unit(get_weight(first_day + i));
     if (!found) {
       min_weight = max_weight = value;
       found = true;
@@ -161,7 +152,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   if (demo) {
     // Render sample points without touching saved measurements or the details list.
     min_weight = max_weight = to_current_unit(DEMO_WEIGHTS[0]);
-    for (int i = 1; i < num_days && i < 15; ++i) {
+    for (int i = 1; i < 15; ++i) {
       double value = to_current_unit(DEMO_WEIGHTS[i]);
       if (value < min_weight) min_weight = value;
       if (value > max_weight) max_weight = value;
@@ -177,10 +168,10 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   GPoint points[32];
   int count = 0;
   for (int i = 0; i < num_days && count < 32; ++i) {
-    if (!demo && !get_measured(i)) continue;
-    if (demo && i >= 15) continue;
+    if (!demo && !get_measured(first_day + i)) continue;
+    
     int x = left + (int)((int32_t)width * i / (num_days - 1 > 0 ? num_days - 1 : 1));
-    points[count++] = GPoint(x, chart_y(to_current_unit(demo ? DEMO_WEIGHTS[i] : get_weight(i)),
+    points[count++] = GPoint(x, chart_y(to_current_unit(demo ? DEMO_WEIGHTS[(i * 14) / (num_days - 1)] : get_weight(first_day + i)),
                                          min_weight, max_weight, top, height));
   }
   if (count == 0) return;
