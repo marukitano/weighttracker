@@ -8,10 +8,10 @@
 
 // Time 2 chart: the retro Bayer dither is adapted from OpenLibreLinkUp.
 // The fill grows denser from left (older) to right (newer), with no min/max labels.
-#define CHART_LEFT 9
+#define CHART_LEFT 0
 #define CHART_TOP -8
-#define CHART_RIGHT 7
-#define CHART_BOTTOM 45
+#define CHART_RIGHT 0
+#define CHART_BOTTOM 79
 
 // Temporary preview: draw sample measurements without saving them.
 #define FORCE_DEMO_CHART 1
@@ -118,9 +118,10 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   const int total_days = get_num_of_days();
   const int first_day = total_days - num_days;
   const int left = CHART_LEFT;
-  const int right = bounds.size.w - CHART_RIGHT;
+  const int right = bounds.size.w - 1 - CHART_RIGHT;
   const int top = CHART_TOP;
   const int baseline = bounds.size.h - CHART_BOTTOM;
+  const int fill_bottom = bounds.size.h - 1;
   // Fixed plot height: always map the recorded weight range into this space.
   const int height = baseline - top;
   const int width = right - left;
@@ -171,7 +172,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
 
   // Dither FIRST so the continuous curve remains crisp above the fill.
   for (int i = 1; i < count; ++i) {
-    draw_dithered_segment(ctx, points[i - 1], points[i], baseline, left, width);
+    draw_dithered_segment(ctx, points[i - 1], points[i], fill_bottom, left, width);
   }
 
   graphics_context_set_stroke_color(ctx, CHARTCOLOR);
