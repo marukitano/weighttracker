@@ -5,14 +5,16 @@
 #include "../support/parameters.h"
 #include "../windows/details.h"
 
-#define DETAILS_LENGTH 450
-#define LINE_LENGTH 25
+#define DETAILS_LENGTH 1024
+#define LINE_LENGTH 64
 #define DATE_LENGTH 15
 #define WEIGHT_LENGTH 10
 
 static const int VERT_SCROLL_TEXT_PADDING = 4;
 static const int TEXT_PADDING = 4;
+#ifdef PBL_ROUND
 static const int SCROLL_LAYER_MARGIN = 32;
+#endif
 static const int MAX_TEXT_LAYER_SIZE = 2000;
 
 static char details[DETAILS_LENGTH + 1] = "";
@@ -34,7 +36,7 @@ static void prepare_content(void) {
     if (get_measured(i)) {
       date_str(get_date(i), date_s, DATE_LENGTH);
       double_str(to_current_unit(get_weight(i)), weight_s, WEIGHT_LENGTH);
-      snprintf(line, LINE_LENGTH, "- %s: %s %s", date_s, weight_s, get_short_unit_name());
+      snprintf(line, sizeof(line), "- %s: %s %s", date_s, weight_s, get_short_unit_name());
 
       if (first) {
         first = 0;
