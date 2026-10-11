@@ -140,8 +140,10 @@ static void format_history_weight(int offset, char *out, size_t len) {
 static void weight_slide_draw(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int height = bounds.size.h;
-  graphics_context_set_text_color(ctx, FOREGROUND);
-  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  graphics_context_set_text_color(ctx, GColorBlack);
+  GFont font = fonts_get_system_font(FONT_KEY_ROBOTO_BOLD_SUBSET_49);
   if (!s_slide_running) {
     graphics_draw_text(ctx, s_new_weight_text, font, bounds,
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
@@ -213,7 +215,7 @@ static void initialise_ui(void) {
 
   // s_textlayer_1
 #ifdef PBL_PLATFORM_EMERY
-  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 58, bounds.size.w, 44));
+  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 72, bounds.size.w - 36, 72));
 #else
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
 #endif
