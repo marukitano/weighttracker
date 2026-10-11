@@ -95,7 +95,7 @@ static void initialise_ui(void) {
 
   // s_textlayer_1
 #ifdef PBL_PLATFORM_EMERY
-  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 34, bounds.size.w, 30));
+  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 42, bounds.size.w, 30));
 #else
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
 #endif
@@ -126,20 +126,8 @@ void display_info(void) {
   static char header_weight[16];
   double_str(to_current_unit(get_chart_display_weight()), header_weight, 15);
   text_layer_set_text(s_textlayer_2, header_weight);
-  static char date[16];
-  static char weight[11];
-  static char info[64];
-  uint32_t cdt = get_latest_date();
-
-  if (has_used_already() && cdt > 0) {
-    date_str(cdt, date, 15);
-    double_str(to_current_unit(get_latest_weight()), weight, 10);
-    snprintf(info, sizeof(info), "Last: %s - %s %s", date, weight, get_short_unit_name());
-  } else {
-    snprintf(info, sizeof(info), "No measurement yet");
-  }
-
-  text_layer_set_text(s_textlayer_1, info);
+  // Temporary fixed preview caption while demo chart is enabled.
+  text_layer_set_text(s_textlayer_1, "11.10.2016: 112kg");
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
