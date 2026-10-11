@@ -18,6 +18,11 @@
 // Temporary preview: draw sample measurements without saving them.
 #define FORCE_DEMO_CHART 1
 static double s_multiplier = 1.0;
+static uint8_t s_pulse_step = 0;
+
+void set_chart_pulse_step(uint8_t step) {
+  s_pulse_step = step % 40;
+}
 
 // Preview only: used when no actual measurements exist. Never persisted.
 static const double DEMO_WEIGHTS[15] = {
@@ -50,23 +55,31 @@ static int chart_y(double value, double minimum, double maximum, int top, int he
   return top + height - (int)(fraction * height * s_multiplier);
 }
 
+// Per-pixel ordered dithering avoids visible vertical two-pixel columns.
+// A soft, travelling brightness band crosses the filled area every 2 seconds.
 static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
-                                   int baseline, int left, int width) {
+                                  int baseline, int left, int width) {
   if (end.x <= start.x || width <= 0) return;
 
-  graphics_context_set_fill_color(ctx, CHARTCOLOR);
+  graphics_context_set_stroke_color(ctx, CHARTCOLOR);
+  const int pulse_center = left - 32 + ((width + 64) * s_pulse_step) / 39;
+  const int pulse_radius = 30;
 
-  // Logical 2x2 pixels and Bayer thresholds match the original Gluco style.
-  for (int x = start.x; x <= end.x; x += 2) {
+  for (int x = start.x; x < end.x; ++x) {
     int y = start.y + (int)((int32_t)(end.y - start.y) * (x - start.x) /
                              (end.x - start.x));
-    int density = 1 + (x - left) * 63 / width;
-    if (density > 64) density = 64;
-    if (density < 1) density = 1;
+    if (y >= baseline) continue;
 
-    for (int fill_y = y + 2; fill_y <= baseline; fill_y += 2) {
-      if (DITHER_8X8[(fill_y / 2) & 7][(x / 2) & 7] < density) {
-        graphics_fill_rect(ctx, GRect(x, fill_y, 2, 2), 0, GCornerNone);
+    int distance = x - pulse_center;
+    if (distance < 0) distance = -distance;
+    int boost = distance < pulse_radius
+                  ? ((pulse_radius - distance) * 32) / pulse_radius : 0;
+    // Constant base density, variable pulse density; no vertical stripe columns.
+    int density = 19 + boost;
+
+    for (int py = y + 2; py < baseline; ++py) {
+      if (DITHER_8X8[py & 7][x & 7] < density) {
+        graphics_draw_pixel(ctx, GPoint(x, py));
       }
     }
   }
