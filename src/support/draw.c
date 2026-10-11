@@ -30,6 +30,31 @@ static const double DEMO_WEIGHTS[15] = {
 };
 
 // Match the displayed header to the temporary preview curve.
+double get_chart_history_weight(int offset) {
+#if FORCE_DEMO_CHART
+  if (offset < 0 || offset >= 15) return -1.0;
+  return DEMO_WEIGHTS[14 - offset];
+#else
+  int index = get_num_of_days() - 1 - offset;
+  while (index >= 0) {
+    if (get_measured(index)) return get_weight(index);
+    --index;
+  }
+  return -1.0;
+#endif
+}
+
+int get_chart_history_count(void) {
+#if FORCE_DEMO_CHART
+  return 15;
+#else
+  int count = 0;
+  for (int i = 0; i < get_num_of_days(); ++i)
+    if (get_measured(i)) ++count;
+  return count;
+#endif
+}
+
 double get_chart_display_weight(void) {
 #if FORCE_DEMO_CHART
   return DEMO_WEIGHTS[14];
