@@ -17,6 +17,12 @@
 
 static double s_multiplier = 1.0;
 
+// Preview only: used when no actual measurements exist. Never persisted.
+static const double DEMO_WEIGHTS[15] = {
+  80.8, 80.6, 80.9, 80.4, 80.2, 80.5, 80.0, 79.8,
+  80.1, 79.7, 79.5, 79.8, 79.3, 79.1, 79.2
+};
+
 static const uint8_t DITHER_8X8[8][8] = {
   { 0, 32, 8, 40, 2, 34, 10, 42 },
   { 48, 16, 56, 24, 50, 18, 58, 26 },
@@ -112,7 +118,19 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
       if (value > max_weight) max_weight = value;
     }
   }
-  if (!found) return;
+  const bool demo = !found;
+  if (demo) {
+    // Render sample points without touching saved measurements or the details list.
+    min_weight = max_weight = to_current_unit(DEMO_WEIGHTS[0]);
+    for (int i = 1; i < num_days && i < 15; ++i) {
+      double value = to_current_unit(DEMO_WEIGHTS[i]);
+      if (value < min_weight) min_weight = value;
+      if (value > max_weight) max_weight = value;
+    }
+    graphics_draw_text(ctx, "DEMO", fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
+                       GRect(right - 48, top, 46, 18),
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
+  }
 
   // Padding keeps flat or near-flat weight histories legible.
   double spread = max_weight - min_weight;
@@ -123,9 +141,10 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   GPoint points[32];
   int count = 0;
   for (int i = 0; i < num_days && count < 32; ++i) {
-    if (!get_measured(i)) continue;
+    if (!demo && !get_measured(i)) continue;
+    if (demo && i >= 15) continue;
     int x = left + (int)((int32_t)width * i / (num_days - 1 > 0 ? num_days - 1 : 1));
-    points[count++] = GPoint(x, chart_y(to_current_unit(get_weight(i)),
+    points[count++] = GPoint(x, chart_y(to_current_unit(demo ? DEMO_WEIGHTS[i] : get_weight(i)),
                                          min_weight, max_weight, top, height));
   }
   if (count == 0) return;
