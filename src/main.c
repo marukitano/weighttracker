@@ -119,14 +119,14 @@ static void initialise_ui(void) {
 
   // s_textlayer_1
 #ifdef PBL_PLATFORM_EMERY
-  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 54, bounds.size.w, 36));
+  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 58, bounds.size.w, 44));
 #else
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
 #endif
   text_layer_set_background_color(s_textlayer_1, GColorClear);
   text_layer_set_text_color(s_textlayer_1, FOREGROUND);
   text_layer_set_text_alignment(s_textlayer_1, GTextAlignmentCenter);
-  text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+  text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_1);
 
   // Lower right button indicator: center 36px above bottom, as in Swiss Chronograph.
@@ -161,7 +161,7 @@ void display_info(void) {
   text_layer_set_text(s_textlayer_2,
                       get_chart_days() == 30 ? "Last 30 days" : "Last 15 days");
   // Temporary fixed preview caption while demo chart is enabled.
-  text_layer_set_text(s_textlayer_1, "11.10.2016: 112kg");
+  text_layer_set_text(s_textlayer_1, "112kg");
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
