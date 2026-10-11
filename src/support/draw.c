@@ -138,8 +138,8 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     graphics_draw_line(ctx, GPoint(tick_x[i], baseline),
                        GPoint(tick_x[i], baseline + TICK_LONG));
     graphics_draw_text(ctx, tick_labels[i],
-                       fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                       GRect(tick_x[i] - 16, baseline + 4, 32, 23),
+                       fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+                       GRect(tick_x[i] - 18, baseline + 4, 36, 29),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
   }
 
