@@ -35,10 +35,11 @@ double get_chart_history_weight(int offset) {
   if (offset < 0 || offset >= 15) return -1.0;
   return DEMO_WEIGHTS[14 - offset];
 #else
-  int index = get_num_of_days() - 1 - offset;
-  while (index >= 0) {
-    if (get_measured(index)) return get_weight(index);
-    --index;
+  int seen = 0;
+  for (int index = get_num_of_days() - 1; index >= 0; --index) {
+    if (!get_measured(index)) continue;
+    if (seen == offset) return get_weight(index);
+    ++seen;
   }
   return -1.0;
 #endif
