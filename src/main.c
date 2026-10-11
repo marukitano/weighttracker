@@ -77,7 +77,7 @@ static void initialise_ui(void) {
   s_textlayer_2 = text_layer_create(GRect(0, PBL_IF_ROUND_ELSE(14, 0), bounds.size.w, PBL_IF_ROUND_ELSE(24, 28)));
   text_layer_set_background_color(s_textlayer_2, GColorClear);
   text_layer_set_text_color(s_textlayer_2, FOREGROUND);
-  text_layer_set_text(s_textlayer_2, "WeightTracker");
+  text_layer_set_text(s_textlayer_2, "");
   text_layer_set_text_alignment(s_textlayer_2, GTextAlignmentCenter);
   text_layer_set_font(s_textlayer_2, fonts_get_system_font(PBL_IF_ROUND_ELSE(FONT_KEY_GOTHIC_14_BOLD, FONT_KEY_GOTHIC_24_BOLD)));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_2);
@@ -87,7 +87,7 @@ static void initialise_ui(void) {
   // draw_chart_callback derives its geometry from these layer bounds.
   // s_chart
 #ifdef PBL_PLATFORM_EMERY
-  s_chart = layer_create(GRect(0, 40, bounds.size.w, bounds.size.h - 74));
+  s_chart = layer_create(GRect(0, 34, bounds.size.w, bounds.size.h - 68));
 #else
   s_chart = layer_create(GRect(PBL_IF_ROUND_ELSE((bounds.size.w - 144) / 2 - 4, 0), 40, 144, 110));
 #endif
@@ -123,6 +123,9 @@ static void wakeup_handler(/* WakeupId id, int32_t reason */) {
 }
 
 void display_info(void) {
+  static char header_weight[16];
+  double_str(to_current_unit(get_chart_display_weight()), header_weight, 15);
+  text_layer_set_text(s_textlayer_2, header_weight);
   static char date[16];
   static char weight[11];
   static char info[64];
