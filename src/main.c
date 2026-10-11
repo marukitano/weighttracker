@@ -99,12 +99,14 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(icon_left, center_y[i] + 4),
                          GPoint(icon_right - 5, center_y[i] + 4));
     } else {
-      const int tip_x = (i == 0) ? icon_right - 2 : icon_left + 2;
-      const int outer_x = (i == 0) ? icon_left + 2 : icon_right - 2;
-      graphics_draw_line(ctx, GPoint(outer_x, center_y[i] - 7),
-                         GPoint(tip_x, center_y[i]));
-      graphics_draw_line(ctx, GPoint(tip_x, center_y[i]),
-                         GPoint(outer_x, center_y[i] + 7));
+      // Upper key: up chevron; lower key: down chevron.
+      const int mid_x = (icon_left + icon_right) / 2;
+      const int tip_y = center_y[i] + (i == 0 ? -6 : 6);
+      const int arm_y = center_y[i] + (i == 0 ? 5 : -5);
+      graphics_draw_line(ctx, GPoint(mid_x - 6, arm_y),
+                         GPoint(mid_x, tip_y));
+      graphics_draw_line(ctx, GPoint(mid_x, tip_y),
+                         GPoint(mid_x + 6, arm_y));
     }
   }
 }
