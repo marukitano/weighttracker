@@ -223,16 +223,8 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     graphics_draw_line(ctx, points[i - 1], points[i]);
   }
 
-  // Downward-pointing equilateral triangle, tip 2px above selected point.
-  // Horizontal scanlines give a filled, pixel-perfect marker on Pebble.
+  // White circular marker for the selected measurement, 2px above the line.
   const GPoint marker = points[selected];
-  const int tip_y = marker.y - 2;
-  graphics_context_set_stroke_color(ctx, FOREGROUND);
-  graphics_context_set_stroke_width(ctx, 1);
-  for (int row = 0; row <= 10; ++row) {
-    int half_width = ((10 - row) * 6 + 5) / 10;
-    graphics_draw_line(ctx,
-                       GPoint(marker.x - half_width, tip_y - 10 + row),
-                       GPoint(marker.x + half_width, tip_y - 10 + row));
-  }
+  graphics_context_set_fill_color(ctx, FOREGROUND);
+  graphics_fill_circle(ctx, GPoint(marker.x, marker.y - 7), 5);
 }
