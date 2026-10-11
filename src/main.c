@@ -49,7 +49,7 @@ static void pulse_timer_callback(void *context) {
   s_pulse_step = (s_pulse_step + 1) % 40;
   set_chart_pulse_step(s_pulse_step);
   if (s_chart) layer_mark_dirty(s_chart);
-  s_pulse_timer = app_timer_register(65, pulse_timer_callback, NULL);
+  s_pulse_timer = app_timer_register(125, pulse_timer_callback, NULL);
 }
 
 
@@ -174,7 +174,7 @@ static void handle_window_unload(Window* window) {
 
 static void handle_window_appear(Window* window) {
   s_main_visible = true;
-  if (!s_pulse_timer) s_pulse_timer = app_timer_register(65, pulse_timer_callback, NULL);
+  if (!s_pulse_timer) s_pulse_timer = app_timer_register(125, pulse_timer_callback, NULL);
   display_info();
 }
 
