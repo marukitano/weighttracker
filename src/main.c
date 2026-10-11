@@ -89,6 +89,9 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int center_y[3] = {36, bounds.size.h / 2, bounds.size.h - 36};
   const int edge_x = bounds.size.w;
+  // Continuous red side rail behind all three button markers and icons.
+  graphics_context_set_fill_color(ctx, GColorRed);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_fill_color(ctx, FOREGROUND);
   graphics_context_set_stroke_color(ctx, FOREGROUND);
   graphics_context_set_stroke_width(ctx, 2);
