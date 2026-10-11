@@ -50,7 +50,7 @@ static void menu_draw_row_callback(GContext* ctx, const Layer *cell_layer, MenuI
       break;
 
     case 4:
-      draw_menu_item(ctx, cell_layer, cell_index, "Chart range", get_chart_days() == 30 ? "Last 30 days" : "Last 14 days");
+      draw_menu_item(ctx, cell_layer, cell_index, "Chart range", get_chart_days() == 30 ? "Last 30 days" : "Last 15 days");
       break;
 
     case 5:
