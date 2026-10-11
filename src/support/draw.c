@@ -162,10 +162,23 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
       if (value < min_weight) min_weight = value;
       if (value > max_weight) max_weight = value;
     }
-    graphics_draw_text(ctx, "DEMO", fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
-                       GRect(right - 48, top, 46, 18),
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
   }
+
+  // Show the latest plotted weight in the former DEMO label position.
+  // The temporary demo plot uses its rightmost (today's) sample.
+  static char current_weight_text[16];
+  static char current_weight_label[28];
+  const double displayed_weight = demo
+      ? DEMO_WEIGHTS[num_days - 1 < 15 ? num_days - 1 : 14]
+      : get_latest_weight();
+  double_str(to_current_unit(displayed_weight), current_weight_text,
+             sizeof(current_weight_text) - 1);
+  snprintf(current_weight_label, sizeof(current_weight_label), "%s %s",
+           current_weight_text, get_short_unit_name());
+  graphics_draw_text(ctx, current_weight_label,
+                     fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
+                     GRect(right - 92, top, 90, 18),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
 
   // Padding keeps flat or near-flat weight histories legible.
   double spread = max_weight - min_weight;
