@@ -13,8 +13,6 @@
 #define CHART_RIGHT 0
 #define CHART_BOTTOM 79
 
-// Temporary preview: draw sample measurements without saving them.
-#define FORCE_DEMO_CHART 0
 static double s_multiplier = 1.0;
 static uint8_t s_pulse_step = 0;
 static int s_selected_history_offset = 0;
@@ -27,19 +25,8 @@ void set_chart_pulse_step(uint8_t step) {
   s_pulse_step = step % 40;
 }
 
-// Preview only: used when no actual measurements exist. Never persisted.
-static const double DEMO_WEIGHTS[15] = {
-  101.2, 103.8, 106.5, 104.1, 107.6,
-  109.3, 105.7, 102.4, 108.1, 110.0,
-  106.9, 103.2, 107.4, 104.8, 109.1
-};
-
-// Match the displayed header to the temporary preview curve.
+// Browse only real, saved measurements in reverse chronological order.
 double get_chart_history_weight(int offset) {
-#if FORCE_DEMO_CHART
-  if (offset < 0 || offset >= 15) return -1.0;
-  return DEMO_WEIGHTS[14 - offset];
-#else
   int seen = 0;
   for (int index = get_num_of_days() - 1; index >= 0; --index) {
     if (!get_measured(index)) continue;
@@ -47,28 +34,18 @@ double get_chart_history_weight(int offset) {
     ++seen;
   }
   return -1.0;
-#endif
 }
 
 int get_chart_history_count(void) {
-#if FORCE_DEMO_CHART
-  return 15;
-#else
   int count = 0;
   for (int i = 0; i < get_num_of_days(); ++i)
     if (get_measured(i)) ++count;
   return count;
-#endif
 }
 
 double get_chart_display_weight(void) {
-#if FORCE_DEMO_CHART
-  return DEMO_WEIGHTS[14];
-#else
   return get_latest_weight();
-#endif
 }
-
 
 static const uint8_t DITHER_8X8[8][8] = {
   { 0, 32, 8, 40, 2, 34, 10, 42 },
@@ -173,16 +150,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
       if (value > max_weight) max_weight = value;
     }
   }
-  const bool demo = FORCE_DEMO_CHART || !found;
-  if (demo) {
-    // Render sample points without touching saved measurements or the details list.
-    min_weight = max_weight = to_current_unit(DEMO_WEIGHTS[0]);
-    for (int i = 1; i < 15; ++i) {
-      double value = to_current_unit(DEMO_WEIGHTS[i]);
-      if (value < min_weight) min_weight = value;
-      if (value > max_weight) max_weight = value;
-    }
-  }
+  if (!found) return; // No fake preview when history is empty.
 
   // Padding keeps flat or near-flat weight histories legible.
   double spread = max_weight - min_weight;
@@ -198,12 +166,10 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   double day_values[32];
   bool known[32];
   for (int i = 0; i < num_days; ++i) {
-    known[i] = demo || get_measured(first_day + i);
-    day_values[i] = demo
-        ? to_current_unit(DEMO_WEIGHTS[(i * 14) / (num_days - 1)])
-        : (known[i] ? to_current_unit(get_weight(first_day + i)) : 0);
+    known[i] = get_measured(first_day + i);
+    day_values[i] = known[i] ? to_current_unit(get_weight(first_day + i)) : 0;
   }
-  if (!demo) {
+  {
     int first_known = -1;
     for (int i = 0; i < num_days; ++i) {
       if (known[i]) { first_known = i; break; }
@@ -224,20 +190,14 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
 
   // Highlight the selected actual measurement, not an interpolated day.
   int selected = count - 1;
-  if (demo) {
-    int demo_index = 14 - s_selected_history_offset;
-    if (demo_index < 0) demo_index = 0;
-    selected = (demo_index * (num_days - 1) + 7) / 14;
-  } else {
-    int seen = 0;
-    for (int i = num_days - 1; i >= 0; --i) {
-      if (!known[i]) continue;
-      if (seen == s_selected_history_offset) {
-        selected = i;
-        break;
-      }
-      ++seen;
+  int seen = 0;
+  for (int i = num_days - 1; i >= 0; --i) {
+    if (!known[i]) continue;
+    if (seen == s_selected_history_offset) {
+      selected = i;
+      break;
     }
+    ++seen;
   }
 
   // Dither FIRST so the continuous curve remains crisp above the fill.
@@ -251,8 +211,10 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     graphics_draw_line(ctx, points[i - 1], points[i]);
   }
 
-  // White circular marker for the selected measurement, 2px above the line.
+  // Center the white dot directly ON the plotted line, with a 2px red ring.
   const GPoint marker = points[selected];
+  graphics_context_set_fill_color(ctx, GColorRed);
+  graphics_fill_circle(ctx, marker, 7);
   graphics_context_set_fill_color(ctx, FOREGROUND);
-  graphics_fill_circle(ctx, GPoint(marker.x, marker.y - 7), 5);
+  graphics_fill_circle(ctx, marker, 5);
 }
