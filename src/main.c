@@ -40,6 +40,9 @@ static TextLayer *s_textlayer_1;
 static TextLayer *s_textlayer_2;
 static Layer *s_chart;
 static Layer *s_button_marker;
+static AppTimer *s_button_anim_timer;
+static uint8_t s_button_width = 5;
+static uint8_t s_button_anim_phase = 0;
 static AppTimer *s_pulse_timer;
 static uint8_t s_pulse_step;
 static bool s_main_visible;
@@ -73,7 +76,8 @@ static void pulse_timer_callback(void *context) {
 static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   graphics_context_set_fill_color(ctx, FOREGROUND);
-  graphics_fill_rect(ctx, GRect(0, 0, bounds.size.w, bounds.size.h),
+  graphics_fill_rect(ctx, GRect(bounds.size.w - s_button_width, 0,
+                                s_button_width, bounds.size.h),
                      5, GCornersLeft);
 }
 
@@ -115,9 +119,9 @@ static void initialise_ui(void) {
   text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_1);
 
-  // Right-side physical button indicator, vertically centred.
-  s_button_marker = layer_create(GRect(bounds.size.w - 5,
-                                       (bounds.size.h * 3 / 4) - 26, 5, 52));
+  // Lower right button indicator: center 36px above bottom, as in Swiss Chronograph.
+  s_button_marker = layer_create(GRect(bounds.size.w - 7,
+                                       bounds.size.h - 36 - 26, 7, 52));
   layer_set_update_proc(s_button_marker, button_marker_update);
   layer_add_child(window_get_root_layer(s_window), s_button_marker);
 
@@ -131,6 +135,10 @@ static void destroy_ui(void) {
   window_destroy(s_window);
   text_layer_destroy(s_textlayer_2);
   layer_destroy(s_chart);
+  if (s_button_anim_timer) {
+    app_timer_cancel(s_button_anim_timer);
+    s_button_anim_timer = NULL;
+  }
   layer_destroy(s_button_marker);
   text_layer_destroy(s_textlayer_1);
 }
@@ -140,9 +148,8 @@ static void wakeup_handler(/* WakeupId id, int32_t reason */) {
 }
 
 void display_info(void) {
-  static char header_weight[16];
-  double_str(to_current_unit(get_chart_display_weight()), header_weight, 15);
-  text_layer_set_text(s_textlayer_2, header_weight);
+  text_layer_set_text(s_textlayer_2,
+                      get_chart_days() == 30 ? "Last 30 days" : "Last 15 days");
   // Temporary fixed preview caption while demo chart is enabled.
   text_layer_set_text(s_textlayer_1, "11.10.2016: 112kg");
 }
@@ -163,8 +170,26 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
   show_input();
 }
 
+// Swiss Chronograph-inspired 5px -> 7px -> 5px press feedback.
+static void lower_button_animation(void *context) {
+  s_button_anim_timer = NULL;
+  if (s_button_anim_phase == 0) {
+    s_button_width = 7;
+    s_button_anim_phase = 1;
+    layer_mark_dirty(s_button_marker);
+    s_button_anim_timer = app_timer_register(55, lower_button_animation, NULL);
+  } else {
+    s_button_width = 5;
+    s_button_anim_phase = 0;
+    layer_mark_dirty(s_button_marker);
+    show_details();
+  }
+}
+
 static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  show_details();
+  if (s_button_anim_timer) return;
+  s_button_anim_phase = 0;
+  lower_button_animation(NULL);
 }
 
 static void click_config_provider(void *context) {
@@ -202,6 +227,8 @@ static void handle_window_appear(Window* window) {
 }
 
 static void show_main(void) {
+  s_button_width = 5;
+  s_button_anim_phase = 0;
   s_pulse_step = 0;
   set_chart_pulse_step(0);
   initialise_ui();
