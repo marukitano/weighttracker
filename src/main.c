@@ -92,7 +92,9 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   // Continuous red side rail behind all three button markers and icons.
   graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  // 2px black divider between the chart and the red control rail.
   graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, GRect(0, 0, 2, bounds.size.h), 0, GCornerNone);
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
 
@@ -113,8 +115,8 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
     } else {
       // Upper key: up chevron; lower key: down chevron.
       const int mid_x = (icon_left + icon_right) / 2;
-      const int tip_y = center_y[i] + (i == 0 ? -6 : 6);
-      const int arm_y = center_y[i] + (i == 0 ? 5 : -5);
+      const int tip_y = center_y[i] + (i == 0 ? -4 : 4);
+      const int arm_y = center_y[i] + (i == 0 ? 3 : -3);
       graphics_draw_line(ctx, GPoint(mid_x - 6, arm_y),
                          GPoint(mid_x, tip_y));
       graphics_draw_line(ctx, GPoint(mid_x, tip_y),
