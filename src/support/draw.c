@@ -38,7 +38,8 @@ static const uint8_t DITHER_8X8[8][8] = {
   { 60, 28, 52, 20, 62, 30, 54, 22 },
   { 3, 35, 11, 43, 1, 33, 9, 41 },
   { 51, 19, 59, 27, 49, 17, 57, 25 },
-  { 15, 47, 7, 39, 13, 45, 5, 37 }
+  { 15, 47, 7, 39, 13, 45, 5, 37 },
+  { 63, 31, 55, 23, 61, 29, 53, 21 }
 };
 
 void set_multiplier(double multiplier) {
@@ -55,37 +56,47 @@ static int chart_y(double value, double minimum, double maximum, int top, int he
   return top + height - (int)(fraction * height * s_multiplier);
 }
 
-// Per-pixel ordered dithering avoids visible vertical two-pixel columns.
-// A soft, travelling brightness band crosses the filled area every 2 seconds.
+// Same 2x2-pixel Bayer dither and density formula as OpenLibreLinkUp.
+// Pulse travels from right to left without changing the underlying gradient.
 static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
                                   int baseline, int left, int width) {
   if (end.x <= start.x || width <= 0) return;
 
-  graphics_context_set_stroke_color(ctx, CHARTCOLOR);
-  const int pulse_center = left + width + 32 - ((width + 64) * s_pulse_step) / 39;
-  const int pulse_radius = 30;
+  int fill_start_x = left + width / 4;
+  int fill_width = left + width - fill_start_x;
+  int solid_start = (fill_width * 70) / 100;
+  int pulse_center = left + width + 32 - ((width + 64) * s_pulse_step) / 39;
 
-  for (int x = start.x; x < end.x; ++x) {
+  graphics_context_set_fill_color(ctx, CHARTCOLOR);
+
+  for (int x = start.x; x <= end.x; ++x) {
+    if (x < fill_start_x || ((x - fill_start_x) & 1) != 0) continue;
+
     int y = start.y + (int)((int32_t)(end.y - start.y) * (x - start.x) /
                              (end.x - start.x));
-    if (y >= baseline) continue;
-
-    int distance = x - pulse_center;
-    if (distance < 0) distance = -distance;
-    int boost = distance < pulse_radius
-                  ? ((pulse_radius - distance) * 32) / pulse_radius : 0;
-    // Horizontal ordered-dither gradient: almost empty on the left,
-    // fully filled at the right. The moving pulse adds a soft highlight.
-    int position = x - left;
-    if (position < 0) position = 0;
-    if (position > width) position = width;
-    int density = (position * 64) / width;
-    density += (boost * (64 - density)) / 64;
+    int relative_x = x - fill_start_x;
+    int density = 1;
+    if (relative_x >= solid_start) {
+      density = 64;
+    } else if (solid_start > 0) {
+      density = 1 + (relative_x * 63) / solid_start;
+    }
     if (density > 64) density = 64;
 
-    for (int py = y + 2; py < baseline; ++py) {
-      if (DITHER_8X8[py & 7][x & 7] < density) {
-        graphics_draw_pixel(ctx, GPoint(x, py));
+    // A travelling, gently brighter wave, retaining the original density fade.
+    int distance = x - pulse_center;
+    if (distance < 0) distance = -distance;
+    if (distance < 25) {
+      int pulse = ((25 - distance) * 24) / 25;
+      density += (pulse * (64 - density)) / 64;
+    }
+
+    for (int fill_y = y + 1; fill_y <= baseline; fill_y += 2) {
+      int logical_x = (x - fill_start_x) / 2;
+      int logical_y = fill_y / 2;
+      uint8_t threshold = DITHER_8X8[logical_y & 7][logical_x & 7];
+      if (threshold < density) {
+        graphics_fill_rect(ctx, GRect(x, fill_y, 2, 2), 0, GCornerNone);
       }
     }
   }
