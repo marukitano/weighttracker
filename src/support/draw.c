@@ -62,7 +62,7 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
   if (end.x <= start.x || width <= 0) return;
 
   graphics_context_set_stroke_color(ctx, CHARTCOLOR);
-  const int pulse_center = left - 32 + ((width + 64) * s_pulse_step) / 39;
+  const int pulse_center = left + width + 32 - ((width + 64) * s_pulse_step) / 39;
   const int pulse_radius = 30;
 
   for (int x = start.x; x < end.x; ++x) {
@@ -74,8 +74,14 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
     if (distance < 0) distance = -distance;
     int boost = distance < pulse_radius
                   ? ((pulse_radius - distance) * 32) / pulse_radius : 0;
-    // Constant base density, variable pulse density; no vertical stripe columns.
-    int density = 19 + boost;
+    // Horizontal ordered-dither gradient: almost empty on the left,
+    // fully filled at the right. The moving pulse adds a soft highlight.
+    int position = x - left;
+    if (position < 0) position = 0;
+    if (position > width) position = width;
+    int density = (position * 64) / width;
+    density += (boost * (64 - density)) / 64;
+    if (density > 64) density = 64;
 
     for (int py = y + 2; py < baseline; ++py) {
       if (DITHER_8X8[py & 7][x & 7] < density) {
@@ -174,9 +180,5 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 2);
   for (int i = 1; i < count; ++i) {
     graphics_draw_line(ctx, points[i - 1], points[i]);
-  }
-  graphics_context_set_fill_color(ctx, CHARTCOLOR);
-  for (int i = 0; i < count; ++i) {
-    graphics_fill_circle(ctx, points[i], 2);
   }
 }
