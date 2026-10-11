@@ -52,6 +52,7 @@ static AppTimer *s_weight_animation_timer;
 static int s_history_offset = 0;
 static int s_incoming_offset = 0;
 static int s_slide_frame = 0;
+static int s_slide_direction = 1;
 static bool s_slide_running = false;
 static char s_old_weight_text[24];
 static char s_new_weight_text[24];
@@ -143,10 +144,10 @@ static void weight_slide_draw(Layer *layer, GContext *ctx) {
   }
   int travel = (height * s_slide_frame) / 8;
   graphics_draw_text(ctx, s_old_weight_text, font,
-                     GRect(0, -travel, bounds.size.w, height),
+                     GRect(0, -s_slide_direction * travel, bounds.size.w, height),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
   graphics_draw_text(ctx, s_new_weight_text, font,
-                     GRect(0, height - travel, bounds.size.w, height),
+                     GRect(0, s_slide_direction * (height - travel), bounds.size.w, height),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
@@ -170,6 +171,7 @@ static void change_history(int direction) {
   if (target < 0 || target >= get_chart_history_count()) return;
   snprintf(s_old_weight_text, sizeof(s_old_weight_text), "%s", s_new_weight_text);
   s_incoming_offset = target;
+  s_slide_direction = direction;
   format_history_weight(target, s_new_weight_text, sizeof(s_new_weight_text));
   s_slide_running = true;
   s_slide_frame = 0;
