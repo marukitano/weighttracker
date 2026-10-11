@@ -14,7 +14,7 @@
 #define CHART_BOTTOM 79
 
 // Temporary preview: draw sample measurements without saving them.
-#define FORCE_DEMO_CHART 1
+#define FORCE_DEMO_CHART 0
 static double s_multiplier = 1.0;
 static uint8_t s_pulse_step = 0;
 static int s_selected_history_offset = 0;
@@ -190,27 +190,55 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   min_weight -= pad;
   max_weight += pad;
 
+  // One point per calendar day. Carry the nearest earlier measurement
+  // forward through empty days; extend the first known value left to the edge.
+  // This produces a full-width flat line when only one weight exists.
   GPoint points[32];
   int count = 0;
-  for (int i = 0; i < num_days && count < 32; ++i) {
-    if (!demo && !get_measured(first_day + i)) continue;
-    
-    int x = left + (int)((int32_t)width * i / (num_days - 1 > 0 ? num_days - 1 : 1));
-    points[count++] = GPoint(x, chart_y(to_current_unit(demo ? DEMO_WEIGHTS[(i * 14) / (num_days - 1)] : get_weight(first_day + i)),
+  double day_values[32];
+  bool known[32];
+  for (int i = 0; i < num_days; ++i) {
+    known[i] = demo || get_measured(first_day + i);
+    day_values[i] = demo
+        ? to_current_unit(DEMO_WEIGHTS[(i * 14) / (num_days - 1)])
+        : (known[i] ? to_current_unit(get_weight(first_day + i)) : 0);
+  }
+  if (!demo) {
+    int first_known = -1;
+    for (int i = 0; i < num_days; ++i) {
+      if (known[i]) { first_known = i; break; }
+    }
+    if (first_known < 0) return;
+    // Extend the first measurement backwards to the beginning of the chart.
+    for (int i = 0; i < first_known; ++i)
+      day_values[i] = day_values[first_known];
+    // Missing dates inherit the previous measurement.
+    for (int i = first_known + 1; i < num_days; ++i)
+      if (!known[i]) day_values[i] = day_values[i - 1];
+  }
+  for (int i = 0; i < num_days; ++i) {
+    int x = left + (int)((int32_t)width * i / (num_days - 1));
+    points[count++] = GPoint(x, chart_y(day_values[i],
                                          min_weight, max_weight, top, height));
   }
-  if (count == 0) return;
 
-  // Selected measurement position, including interpolated 30-day demo view.
-  int selected = count - 1 - s_selected_history_offset;
+  // Highlight the selected actual measurement, not an interpolated day.
+  int selected = count - 1;
   if (demo) {
     int demo_index = 14 - s_selected_history_offset;
     if (demo_index < 0) demo_index = 0;
-    if (demo_index > 14) demo_index = 14;
     selected = (demo_index * (num_days - 1) + 7) / 14;
+  } else {
+    int seen = 0;
+    for (int i = num_days - 1; i >= 0; --i) {
+      if (!known[i]) continue;
+      if (seen == s_selected_history_offset) {
+        selected = i;
+        break;
+      }
+      ++seen;
+    }
   }
-  if (selected < 0) selected = 0;
-  if (selected >= count) selected = count - 1;
 
   // Dither FIRST so the continuous curve remains crisp above the fill.
   for (int i = 1; i < count; ++i) {
