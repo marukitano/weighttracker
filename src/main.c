@@ -171,6 +171,8 @@ static void change_history(int direction) {
   if (target < 0 || target >= get_chart_history_count()) return;
   snprintf(s_old_weight_text, sizeof(s_old_weight_text), "%s", s_new_weight_text);
   s_incoming_offset = target;
+  set_chart_selected_history_offset(target);
+  if (s_chart) layer_mark_dirty(s_chart);
   s_slide_direction = direction;
   format_history_weight(target, s_new_weight_text, sizeof(s_new_weight_text));
   s_slide_running = true;
@@ -348,6 +350,7 @@ static void show_main(void) {
   s_active_button = -1;
   s_button_held = false;
   s_history_offset = 0;
+  set_chart_selected_history_offset(0);
   s_slide_running = false;
   s_slide_frame = 0;
   s_pulse_step = 0;
