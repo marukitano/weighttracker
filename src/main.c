@@ -140,8 +140,8 @@ static void format_history_weight(int offset, char *out, size_t len) {
 static void weight_slide_draw(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int height = bounds.size.h;
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  // Cut the number out of the chart fill: paint only black glyph pixels,
+  // without an opaque background rectangle.
   graphics_context_set_text_color(ctx, GColorBlack);
   GFont font = fonts_get_system_font(FONT_KEY_ROBOTO_BOLD_SUBSET_49);
   if (!s_slide_running) {
