@@ -203,7 +203,7 @@ static void initialise_ui(void) {
   // draw_chart_callback derives its geometry from these layer bounds.
   // s_chart
 #ifdef PBL_PLATFORM_EMERY
-  s_chart = layer_create(GRect(0, 34, bounds.size.w, bounds.size.h - 34));
+  s_chart = layer_create(GRect(0, 34, bounds.size.w - 36, bounds.size.h - 34));
 #else
   s_chart = layer_create(GRect(PBL_IF_ROUND_ELSE((bounds.size.w - 144) / 2 - 4, 0), 40, 144, 110));
 #endif
