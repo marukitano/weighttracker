@@ -3,6 +3,7 @@
 #include "../support/reminder.h"
 #include "../support/utils.h"
 #include "../support/parameters.h"
+#include "../support/data.h"
 #include "../windows/settings.h"
 #include "../windows/welcome.h"
 #include "../windows/time.h"
@@ -49,6 +50,10 @@ static void menu_draw_row_callback(GContext* ctx, const Layer *cell_layer, MenuI
       break;
 
     case 4:
+      draw_menu_item(ctx, cell_layer, cell_index, "Chart range", get_chart_days() == 30 ? "Last 30 days" : "Last 14 days");
+      break;
+
+    case 5:
       draw_menu_item(ctx, cell_layer, cell_index, "About page", NULL);
       break;
   }
@@ -80,6 +85,10 @@ static void menu_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, v
       break;
 
     case 4:
+        toggle_chart_days();
+        break;
+
+    case 5:
         show_welcome();
         break;
   }
