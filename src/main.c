@@ -39,6 +39,7 @@ static Window *s_window;
 static TextLayer *s_textlayer_1;
 static TextLayer *s_textlayer_2;
 static Layer *s_chart;
+static Layer *s_button_marker;
 static AppTimer *s_pulse_timer;
 static uint8_t s_pulse_step;
 static bool s_main_visible;
@@ -66,6 +67,15 @@ static void pulse_timer_callback(void *context) {
   s_pulse_timer = app_timer_register(next_delay, pulse_timer_callback, NULL);
 }
 
+
+// Edge-mounted button marker, matching the Swiss Chronograph's
+// 5px x 52px rounded-left hardware-button indicator.
+static void button_marker_update(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  graphics_context_set_fill_color(ctx, FOREGROUND);
+  graphics_fill_rect(ctx, GRect(0, 0, bounds.size.w, bounds.size.h),
+                     5, GCornersLeft);
+}
 
 static void initialise_ui(void) {
   s_window = window_create();
@@ -105,6 +115,12 @@ static void initialise_ui(void) {
   text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_1);
 
+  // Right-side physical button indicator, vertically centred.
+  s_button_marker = layer_create(GRect(bounds.size.w - 5,
+                                       (bounds.size.h - 52) / 2, 5, 52));
+  layer_set_update_proc(s_button_marker, button_marker_update);
+  layer_add_child(window_get_root_layer(s_window), s_button_marker);
+
 #ifdef PBL_ROUND
   text_layer_enable_screen_text_flow_and_paging(s_textlayer_2, 2);
   text_layer_enable_screen_text_flow_and_paging(s_textlayer_1, 2);
@@ -115,6 +131,7 @@ static void destroy_ui(void) {
   window_destroy(s_window);
   text_layer_destroy(s_textlayer_2);
   layer_destroy(s_chart);
+  layer_destroy(s_button_marker);
   text_layer_destroy(s_textlayer_1);
 }
 
