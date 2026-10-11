@@ -4,3 +4,5 @@ void draw_chart_callback(Layer *layer, GContext *ctx);
 void set_multiplier(double m);
 
 void set_chart_pulse_step(uint8_t step);
+
+double get_chart_display_weight(void);
