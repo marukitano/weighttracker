@@ -92,10 +92,11 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
     const int icon_right = edge_x - 14;
     const int icon_left = icon_right - 13;
     if (i == 1) {
-      for (int offset = -6; offset <= 6; offset += 6) {
-        graphics_draw_line(ctx, GPoint(icon_left, center_y[i] + offset),
-                           GPoint(icon_right, center_y[i] + offset));
-      }
+      // Two-line list icon: longer upper stroke, shorter lower stroke.
+      graphics_draw_line(ctx, GPoint(icon_left, center_y[i] - 4),
+                         GPoint(icon_right, center_y[i] - 4));
+      graphics_draw_line(ctx, GPoint(icon_left, center_y[i] + 4),
+                         GPoint(icon_right - 5, center_y[i] + 4));
     } else {
       const int tip_x = (i == 0) ? icon_left + 2 : icon_right - 2;
       const int outer_x = (i == 0) ? icon_right - 2 : icon_left + 2;
