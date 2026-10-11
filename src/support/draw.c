@@ -15,12 +15,15 @@
 #define TICK_SHORT 2
 #define TICK_LONG 4
 
+// Temporary preview: draw sample measurements without saving them.
+#define FORCE_DEMO_CHART 1
 static double s_multiplier = 1.0;
 
 // Preview only: used when no actual measurements exist. Never persisted.
 static const double DEMO_WEIGHTS[15] = {
-  80.8, 80.6, 80.9, 80.4, 80.2, 80.5, 80.0, 79.8,
-  80.1, 79.7, 79.5, 79.8, 79.3, 79.1, 79.2
+  101.2, 103.8, 106.5, 104.1, 107.6,
+  109.3, 105.7, 102.4, 108.1, 110.0,
+  106.9, 103.2, 107.4, 104.8, 109.1
 };
 
 static const uint8_t DITHER_8X8[8][8] = {
@@ -118,7 +121,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
       if (value > max_weight) max_weight = value;
     }
   }
-  const bool demo = !found;
+  const bool demo = FORCE_DEMO_CHART || !found;
   if (demo) {
     // Render sample points without touching saved measurements or the details list.
     min_weight = max_weight = to_current_unit(DEMO_WEIGHTS[0]);
