@@ -127,13 +127,6 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
 
   if (num_days <= 0 || height <= 0 || width <= 0) return;
 
-  // No X-axis or tick marks: the range is shown as plain text.
-  graphics_context_set_text_color(ctx, FOREGROUND);
-  graphics_draw_text(ctx, get_chart_days() == 30 ? "Last 30 days" : "Last 14 days",
-                     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                     GRect(left, baseline + 2, width, 24),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-
   bool found = false;
   double min_weight = 0;
   double max_weight = 0;
