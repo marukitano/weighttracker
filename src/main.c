@@ -92,8 +92,8 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   // Continuous red side rail behind all three button markers and icons.
   graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  graphics_context_set_fill_color(ctx, FOREGROUND);
-  graphics_context_set_stroke_color(ctx, FOREGROUND);
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
@@ -132,7 +132,7 @@ static void format_history_weight(int offset, char *out, size_t len) {
   }
   char number[16];
   double_str(to_current_unit(value), number, sizeof(number) - 1);
-  snprintf(out, len, "%s%s", number, get_short_unit_name());
+  snprintf(out, len, "%s", number);
 }
 
 static void weight_slide_draw(Layer *layer, GContext *ctx) {
