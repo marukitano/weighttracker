@@ -11,7 +11,7 @@
 #define CHART_LEFT 9
 #define CHART_TOP -8
 #define CHART_RIGHT 7
-#define CHART_BOTTOM 40
+#define CHART_BOTTOM 45
 #define TICK_SHORT 2
 #define TICK_LONG 4
 
@@ -131,24 +131,17 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   graphics_context_set_text_color(ctx, FOREGROUND);
   graphics_draw_line(ctx, GPoint(left, baseline), GPoint(right, baseline));
 
-  int weekday = get_week_day();
-  for (int i = num_days - 1; i >= 0; --i) {
-    bool weekly = (i == num_days - 1) ||
-                  (weekday == (is_monday_first() ? 0 : 6));
-    int x = left + (int)((int32_t)width * i / (num_days - 1 > 0 ? num_days - 1 : 1));
-    graphics_draw_line(ctx, GPoint(x, baseline),
-                       GPoint(x, baseline + (weekly ? TICK_LONG : TICK_SHORT)));
-    if (weekly && i < num_days - 1) {
-      graphics_draw_text(ctx, is_monday_first() ? "M" : "S",
-                         fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                         GRect(x - 8, baseline + 4, 16, 17),
-                         GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-    }
-    weekday = (weekday + 6) % 7;
+  // Fixed 14-day labels: oldest at left, middle at day 7, today at right.
+  const int tick_x[3] = {left, left + width / 2, right};
+  const char *tick_labels[3] = {"14", "7", "1"};
+  for (int i = 0; i < 3; ++i) {
+    graphics_draw_line(ctx, GPoint(tick_x[i], baseline),
+                       GPoint(tick_x[i], baseline + TICK_LONG));
+    graphics_draw_text(ctx, tick_labels[i],
+                       fonts_get_system_font(FONT_KEY_GOTHIC_14),
+                       GRect(tick_x[i] - 12, baseline + 4, 24, 17),
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
   }
-  graphics_draw_text(ctx, "T", fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
-                     GRect(right - 8, baseline + 4, 16, 17),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   bool found = false;
   double min_weight = 0;
