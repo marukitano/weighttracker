@@ -39,6 +39,19 @@ static Window *s_window;
 static TextLayer *s_textlayer_1;
 static TextLayer *s_textlayer_2;
 static Layer *s_chart;
+static AppTimer *s_pulse_timer;
+static uint8_t s_pulse_step;
+static bool s_main_visible;
+
+static void pulse_timer_callback(void *context) {
+  s_pulse_timer = NULL;
+  if (!s_main_visible) return;
+  s_pulse_step = (s_pulse_step + 1) % 40;
+  set_chart_pulse_step(s_pulse_step);
+  if (s_chart) layer_mark_dirty(s_chart);
+  s_pulse_timer = app_timer_register(50, pulse_timer_callback, NULL);
+}
+
 
 static void initialise_ui(void) {
   s_window = window_create();
@@ -151,14 +164,23 @@ static void height_update(Animation *anim, AnimationProgress dist_normalized) {
 #endif
 
 static void handle_window_unload(Window* window) {
+  s_main_visible = false;
+  if (s_pulse_timer) {
+    app_timer_cancel(s_pulse_timer);
+    s_pulse_timer = NULL;
+  }
   destroy_ui();
 }
 
 static void handle_window_appear(Window* window) {
+  s_main_visible = true;
+  if (!s_pulse_timer) s_pulse_timer = app_timer_register(50, pulse_timer_callback, NULL);
   display_info();
 }
 
 static void show_main(void) {
+  s_pulse_step = 0;
+  set_chart_pulse_step(0);
   initialise_ui();
 
   layer_set_update_proc(s_chart, draw_chart_callback);
