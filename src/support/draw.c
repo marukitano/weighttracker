@@ -9,10 +9,16 @@
 #define PATTERN2_LENGTH 4
 #define DIVIDER_COUNT 7
 
-#define ORIGO_X 28
-#define ORIGO_Y 9
-#define HEIGHT 70
-#define WIDTH 100
+// Chart geometry is calculated from the chart layer, not a fixed 144x110 box.
+// Original layout: origin (28,9), plotting area 100x70.
+static int s_origo_x = 28;
+static int s_origo_y = 9;
+static int s_plot_height = 70;
+static int s_plot_width = 100;
+#define ORIGO_X s_origo_x
+#define ORIGO_Y s_origo_y
+#define HEIGHT s_plot_height
+#define WIDTH s_plot_width
 #define RIGHT_MARGIN 7
 #define ARROW_LENGTH 5
 #define ARROW_WIDTH 2
@@ -103,6 +109,10 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   bool longtick;
   double div, min, max, step, w;
   GPoint sp, ep;
+
+  const GRect bounds = layer_get_bounds(layer);
+  s_plot_width = bounds.size.w - ORIGO_X - RIGHT_MARGIN - 9;
+  s_plot_height = bounds.size.h - ORIGO_Y - 31;
 
   const int num_of_days = get_num_of_days();
 
