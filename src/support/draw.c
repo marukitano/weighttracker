@@ -9,9 +9,9 @@
 // Time 2 chart: the retro Bayer dither is adapted from OpenLibreLinkUp.
 // The fill grows denser from left (older) to right (newer), with no min/max labels.
 #define CHART_LEFT 9
-#define CHART_TOP 7
+#define CHART_TOP -8
 #define CHART_RIGHT 7
-#define CHART_BOTTOM 35
+#define CHART_BOTTOM 40
 #define TICK_SHORT 2
 #define TICK_LONG 4
 
