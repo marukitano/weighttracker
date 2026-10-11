@@ -41,8 +41,9 @@ static TextLayer *s_textlayer_2;
 static Layer *s_chart;
 static Layer *s_button_marker;
 static AppTimer *s_button_anim_timer;
-static uint8_t s_button_width = 5;
-static uint8_t s_button_anim_phase = 0;
+static uint8_t s_button_width[3] = {5, 5, 5};
+static int8_t s_active_button = -1;
+static bool s_button_held = false;
 static AppTimer *s_pulse_timer;
 static uint8_t s_pulse_step;
 static bool s_main_visible;
@@ -84,7 +85,7 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
-    int marker_width = (i == 2) ? s_button_width : 5;
+    int marker_width = s_button_width[i];
     graphics_fill_rect(ctx,
                        GRect(edge_x - marker_width, center_y[i] - 26,
                              marker_width, 52),
@@ -98,8 +99,8 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(icon_left, center_y[i] + 4),
                          GPoint(icon_right - 5, center_y[i] + 4));
     } else {
-      const int tip_x = (i == 0) ? icon_left + 2 : icon_right - 2;
-      const int outer_x = (i == 0) ? icon_right - 2 : icon_left + 2;
+      const int tip_x = (i == 0) ? icon_right - 2 : icon_left + 2;
+      const int outer_x = (i == 0) ? icon_left + 2 : icon_right - 2;
       graphics_draw_line(ctx, GPoint(outer_x, center_y[i] - 7),
                          GPoint(tip_x, center_y[i]));
       graphics_draw_line(ctx, GPoint(tip_x, center_y[i]),
@@ -188,40 +189,50 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   }
 }
 
-static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  show_settings();
-}
-
-static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
-  show_input();
-}
-
-// Swiss Chronograph-inspired 5px -> 7px -> 5px press feedback.
-static void lower_button_animation(void *context) {
+// Same hold-sensitive 5 -> 7 -> 5 pixel action as Swiss Chronograph.
+// Navigation happens after the release animation, not on press.
+static void button_anim_tick(void *context) {
   s_button_anim_timer = NULL;
-  if (s_button_anim_phase == 0) {
-    s_button_width = 7;
-    s_button_anim_phase = 1;
+  if (s_active_button < 0 || !s_button_marker) return;
+  int i = s_active_button;
+  if (s_button_held) {
+    if (s_button_width[i] < 7) s_button_width[i]++;
     layer_mark_dirty(s_button_marker);
-    s_button_anim_timer = app_timer_register(55, lower_button_animation, NULL);
+    if (s_button_width[i] < 7)
+      s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
+  } else if (s_button_width[i] > 5) {
+    s_button_width[i]--;
+    layer_mark_dirty(s_button_marker);
+    s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
   } else {
-    s_button_width = 5;
-    s_button_anim_phase = 0;
-    layer_mark_dirty(s_button_marker);
-    show_details();
+    s_active_button = -1;
+    if (i == 0) show_settings();
+    else if (i == 1) show_input();
+    else show_details();
   }
 }
 
-static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (s_button_anim_timer) return;
-  s_button_anim_phase = 0;
-  lower_button_animation(NULL);
+static void button_raw_down(ClickRecognizerRef recognizer, void *context) {
+  if (s_active_button >= 0) return;
+  ButtonId id = click_recognizer_get_button_id(recognizer);
+  int i = id == BUTTON_ID_UP ? 0 : id == BUTTON_ID_SELECT ? 1 : 2;
+  s_active_button = i;
+  s_button_held = true;
+  if (s_button_anim_timer) app_timer_cancel(s_button_anim_timer);
+  s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
+}
+
+static void button_raw_up(ClickRecognizerRef recognizer, void *context) {
+  if (s_active_button < 0) return;
+  s_button_held = false;
+  if (s_button_anim_timer) app_timer_cancel(s_button_anim_timer);
+  s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
 }
 
 static void click_config_provider(void *context) {
-  window_single_click_subscribe(BUTTON_ID_UP, up_click_handler);
-  window_single_click_subscribe(BUTTON_ID_SELECT, select_click_handler);
-  window_single_click_subscribe(BUTTON_ID_DOWN, down_click_handler);
+  window_raw_click_subscribe(BUTTON_ID_UP, button_raw_down, button_raw_up, NULL);
+  window_raw_click_subscribe(BUTTON_ID_SELECT, button_raw_down, button_raw_up, NULL);
+  window_raw_click_subscribe(BUTTON_ID_DOWN, button_raw_down, button_raw_up, NULL);
 }
 
 #ifndef PBL_PLATFORM_APLITE
@@ -253,8 +264,9 @@ static void handle_window_appear(Window* window) {
 }
 
 static void show_main(void) {
-  s_button_width = 5;
-  s_button_anim_phase = 0;
+  for (int i = 0; i < 3; ++i) s_button_width[i] = 5;
+  s_active_button = -1;
+  s_button_held = false;
   s_pulse_step = 0;
   set_chart_pulse_step(0);
   initialise_ui();
