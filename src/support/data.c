@@ -7,7 +7,8 @@
 #include "../support/pin.h"
 
 // constants
-#define NUM_OF_DAYS 15
+#define NUM_OF_DAYS 30
+#define CHART_RANGE_KEY 13
 #define LAST_STORED_DATE_KEY 0
 #define UNIT_KEY 1
 #define FORMAT_KEY 2
@@ -20,10 +21,16 @@
 #define PIN_REMINDER_ID 10
 #define PIN_MEASUREMENT_ID 11
 #define FIRST_DAY_KEY 12
-#define TODAY_INDEX 14
+#define TODAY_INDEX (NUM_OF_DAYS - 1)
 #define WT_CURRENT_VERSION 1.2
 
 // global variables
+static int s_chart_days = 14;
+int get_chart_days(void) { return s_chart_days; }
+void toggle_chart_days(void) {
+  s_chart_days = s_chart_days == 14 ? 30 : 14;
+  persist_write_int(CHART_RANGE_KEY, s_chart_days);
+}
 static double s_current_weight;
 static uint32_t s_current_date;
 static uint32_t s_last_stored_date;
@@ -134,6 +141,8 @@ void load_data(void) {
   }
 
   init_settings(unit, format, fday);
+  s_chart_days = persist_exists(CHART_RANGE_KEY) &&
+                 persist_read_int(CHART_RANGE_KEY) == 30 ? 30 : 14;
 
   if (persist_exists(REMINDER_FLAG_KEY)) {
     hr = persist_read_int(REMINDER_FLAG_KEY);
