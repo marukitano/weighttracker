@@ -9,7 +9,7 @@
 #define RAIL_WIDTH 36
 #define ROW_HEIGHT 30
 #define ROW_TEXT_Y 5
-#define MAX_LIST_HEIGHT (HISTORY_CAPACITY * ROW_HEIGHT)
+#define MAX_LIST_HEIGHT ((HISTORY_CAPACITY + 1) * ROW_HEIGHT)
 
 static Window *s_window;
 static ScrollLayer *s_scrolllayer;
@@ -20,14 +20,7 @@ static int s_selected = 0;
 static void list_draw(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   int count = get_history_count();
-  if (!count) {
-    graphics_context_set_text_color(ctx, GColorWhite);
-    graphics_draw_text(ctx, "No measurements", fonts_get_system_font(FONT_KEY_GOTHIC_18),
-                       GRect(4, 5, bounds.size.w - 8, 30),
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-    return;
-  }
-  for (int i = 0; i < count; ++i) {
+  for (int i = 0; i <= count; ++i) {
     int y = i * ROW_HEIGHT;
     bool active = i == s_selected;
     if (active) {
@@ -36,7 +29,14 @@ static void list_draw(Layer *layer, GContext *ctx) {
                          0, GCornerNone);
     }
     graphics_context_set_text_color(ctx, active ? GColorBlack : GColorWhite);
-    uint32_t date = get_history_date(i);
+    if (i == 0) {
+      graphics_draw_text(ctx, "+", fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+                         GRect(8, y, bounds.size.w - 12, ROW_HEIGHT),
+                         GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+      continue;
+    }
+    int history_offset = i - 1;
+    uint32_t date = get_history_date(history_offset);
     char date_str_buf[16];
     char weight_str[16];
     char value_str[24];
@@ -44,15 +44,15 @@ static void list_draw(Layer *layer, GContext *ctx) {
              (unsigned long)(date % 100),
              (unsigned long)((date / 100) % 100),
              (unsigned long)(date / 10000));
-    double_str(to_current_unit(get_history_weight(i)), weight_str, sizeof(weight_str));
+    double_str(to_current_unit(get_history_weight(history_offset)), weight_str, sizeof(weight_str));
     snprintf(value_str, sizeof(value_str), "%s %s", weight_str,
              get_current_unit_index() == 0 ? "kg" : get_short_unit_name());
-    // Fixed columns keep a clearly visible gap between date and weight.
+    // Weight first, date second, with room for the right-side icons.
     GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
-    graphics_draw_text(ctx, date_str_buf, font, GRect(4, y + ROW_TEXT_Y, 91, 23),
+    graphics_draw_text(ctx, value_str, font, GRect(4, y + ROW_TEXT_Y, 76, 23),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-    graphics_draw_text(ctx, value_str, font,
-                       GRect(101, y + ROW_TEXT_Y, bounds.size.w - 103, 23),
+    graphics_draw_text(ctx, date_str_buf, font,
+                       GRect(85, y + ROW_TEXT_Y, bounds.size.w - 121, 23),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
   }
 }
@@ -70,10 +70,15 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
                        5, GCornersLeft);
     const int mid_x = right - 21;
     if (i == 1) {
-      graphics_draw_line(ctx, GPoint(mid_x - 6, centers[i]),
-                         GPoint(mid_x + 6, centers[i]));
-      graphics_draw_line(ctx, GPoint(mid_x, centers[i] - 6),
-                         GPoint(mid_x, centers[i] + 6));
+      // Diagonal edit pencil, pointing toward the lower left.
+      graphics_draw_line(ctx, GPoint(mid_x - 6, centers[i] + 6),
+                         GPoint(mid_x + 5, centers[i] - 5));
+      graphics_draw_line(ctx, GPoint(mid_x - 4, centers[i] + 8),
+                         GPoint(mid_x + 7, centers[i] - 3));
+      graphics_draw_line(ctx, GPoint(mid_x + 5, centers[i] - 5),
+                         GPoint(mid_x + 7, centers[i] - 3));
+      graphics_draw_line(ctx, GPoint(mid_x - 6, centers[i] + 6),
+                         GPoint(mid_x - 4, centers[i] + 8));
     } else {
       const int tip_y = centers[i] + (i == 0 ? -4 : 4);
       const int arm_y = centers[i] + (i == 0 ? 3 : -3);
@@ -84,11 +89,12 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
 }
 
 static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
-  show_input();
+  if (s_selected == 0) show_input();
+  else show_input_edit(s_selected - 1);
 }
 
 static void details_move(ClickRecognizerRef recognizer, void *context) {
-  int count = get_history_count();
+  int count = get_history_count() + 1;
   if (count < 1) return;
   int step = click_recognizer_get_button_id(recognizer) == BUTTON_ID_UP ? -1 : 1;
   int target = s_selected + step;
@@ -119,15 +125,14 @@ static void details_click_config(void *context) {
 static void refresh_details(void) {
   if (!s_scrolllayer || !s_list_layer) return;
   int count = get_history_count();
-  if (count < 1) s_selected = 0;
-  else if (s_selected >= count) s_selected = count - 1;
-  int height = (count > 0 ? count : 1) * ROW_HEIGHT;
+  if (s_selected > count) s_selected = count;
+  int height = (count + 1) * ROW_HEIGHT;
   if (height > MAX_LIST_HEIGHT) height = MAX_LIST_HEIGHT;
   GRect frame = layer_get_frame(s_list_layer);
   layer_set_frame(s_list_layer, GRect(0, 0, frame.size.w, height));
   scroll_layer_set_content_size(s_scrolllayer, GSize(frame.size.w, height));
   scroll_layer_set_content_offset(s_scrolllayer, GPoint(0, 0), false);
-  s_selected = 0; // Always start on the newest measurement.
+  // Keep the selection when returning from the editor.
   layer_mark_dirty(s_list_layer);
 }
 
