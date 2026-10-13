@@ -207,28 +207,39 @@ static int vertical_glyph_index(char ch) {
 
 // Whole horizontal string turned 90 degrees clockwise:
 // a source pixel (u, v) becomes (height - 1 - v, u).
+static int rotated_char_width(char c, int scale) {
+  // Spaces and punctuation are much narrower than a digit.
+  if (c == ' ') return 2 * scale;
+  if (c == '.') return 4 * scale;
+  return 6 * scale;
+}
+
 static void draw_clockwise_label(GContext *ctx, const char *label,
                                  int center_x, int anchor_y,
                                  int scale, bool above, int display_height) {
-  int count = 0;
-  while (label[count] && count < 20) ++count;
-  int total = count * 6 * scale;
+  int count = 0, total = 0;
+  while (label[count] && count < 20) {
+    total += rotated_char_width(label[count], scale);
+    ++count;
+  }
   int y0 = above ? anchor_y - total : anchor_y;
   if (y0 < 0) y0 = 0;
   if (y0 + total > display_height) y0 = display_height - total;
   if (y0 < 0) y0 = 0;
   int x0 = center_x - (7 * scale) / 2;
   graphics_context_set_fill_color(ctx, GColorBlack);
+  int cursor = 0;
   for (int c = 0; c < count; ++c) {
     const uint8_t *glyph = ROTATED_GLYPHS[vertical_glyph_index(label[c])];
     for (int v = 0; v < 7; ++v) {
       for (int u = 0; u < 5; ++u) {
         if (!(glyph[v] & (1 << (4 - u)))) continue;
         graphics_fill_rect(ctx,
-          GRect(x0 + (6 - v) * scale, y0 + (c * 6 + u) * scale,
+          GRect(x0 + (6 - v) * scale, y0 + cursor + u * scale,
                 scale, scale), 0, GCornerNone);
       }
     }
+    cursor += rotated_char_width(label[c], scale);
   }
 }
 
@@ -250,7 +261,7 @@ static void draw_measurement_labels(GContext *ctx, GPoint marker,
   char number[16], weight_text[28];
   double_str(to_current_unit(weight), number, sizeof(number) - 1);
   snprintf(weight_text, sizeof(weight_text), "%s", number);
-  draw_clockwise_label(ctx, date_text, marker.x, marker.y - 15,
+  draw_clockwise_label(ctx, date_text, marker.x, marker.y - 12,
                        2, true, display_height);
   draw_clockwise_label(ctx, weight_text, marker.x, marker.y + 15,
                        2, false, display_height);
