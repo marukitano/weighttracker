@@ -213,7 +213,7 @@ static int bmi_band(double display_weight) {
 }
 static GColor band_fill(int band) {
   if (band == 0) return GColorDarkGreen;
-  if (band == 1) return GColorDarkYellow;
+  if (band == 1) return GColorWindsorTan;
   return GColorDarkCandyAppleRed;
 }
 static GColor band_stroke(int band) {
