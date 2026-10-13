@@ -75,8 +75,8 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(mid_x, centers[i] - 6),
                          GPoint(mid_x, centers[i] + 6));
     } else {
-      const int tip_y = centers[i] + (i == 0 ? 4 : -4);
-      const int arm_y = centers[i] + (i == 0 ? -3 : 3);
+      const int tip_y = centers[i] + (i == 0 ? -4 : 4);
+      const int arm_y = centers[i] + (i == 0 ? 3 : -3);
       graphics_draw_line(ctx, GPoint(mid_x - 6, arm_y), GPoint(mid_x, tip_y));
       graphics_draw_line(ctx, GPoint(mid_x, tip_y), GPoint(mid_x + 6, arm_y));
     }
@@ -90,7 +90,7 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
 static void details_move(ClickRecognizerRef recognizer, void *context) {
   int count = get_history_count();
   if (count < 1) return;
-  int step = click_recognizer_get_button_id(recognizer) == BUTTON_ID_UP ? 1 : -1;
+  int step = click_recognizer_get_button_id(recognizer) == BUTTON_ID_UP ? -1 : 1;
   int target = s_selected + step;
   if (target < 0 || target >= count) return;
   s_selected = target;
