@@ -171,32 +171,34 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
   }
 }
 
-// 3x5 pixel characters, rotated 90 degrees as one DD.MM. label.
-// Each source pixel is enlarged to 2x2 display pixels for readability.
+// Tiny pixel characters for vertically oriented date and weight labels.
 static const uint8_t DATE_GLYPHS[11][5] = {
   {7,5,5,5,7}, {2,6,2,2,7}, {7,1,7,4,7}, {7,1,7,1,7},
   {5,5,7,1,1}, {7,4,7,1,7}, {7,4,7,5,7}, {7,1,1,1,1},
   {7,5,7,5,7}, {7,5,7,1,7}, {0,0,0,2,2}
 };
 
-static void draw_vertical_date(GContext *ctx, const char *label,
-                               GPoint marker, GRect bounds) {
+// Vertical text: date reads in the opposite orientation to the earlier
+// version (180-degree rotation); weight is placed underneath the marker.
+static void draw_vertical_label(GContext *ctx, const char *label,
+                                GPoint marker, bool above) {
   const int pixel = 2;
-  const int total_height = 6 * 4 * pixel; // DD.MM. has six characters.
+  int n = 0;
+  while (label[n] && n < 12) ++n;
+  if (!n) return;
   int x0 = marker.x - 5;
-  if (x0 < 0) x0 = 0;
-  if (x0 > bounds.size.w - 10) x0 = bounds.size.w - 10;
-  int bottom = marker.y - 14;
-  if (bottom < total_height) bottom = total_height;
+  int origin_y = above ? marker.y - 16 - 8 * n : marker.y + 16;
   graphics_context_set_fill_color(ctx, GColorBlack);
-  for (int c = 0; label[c] && c < 6; ++c) {
+  for (int c = 0; c < n; ++c) {
     int glyph = label[c] == '.' ? 10 : label[c] - '0';
     if (glyph < 0 || glyph > 10) continue;
     for (int row = 0; row < 5; ++row) {
       for (int col = 0; col < 3; ++col) {
         if (!(DATE_GLYPHS[glyph][row] & (1 << (2 - col)))) continue;
-        int x = x0 + row * pixel;
-        int y = bottom - (c * 4 + col + 1) * pixel;
+        // Rotate each complete horizontal glyph by 90 degrees, and arrange
+        // characters upward (date) or downward (weight).
+        int x = x0 + (above ? 4 - row : row) * pixel;
+        int y = origin_y + c * 8 + (above ? 2 - col : col) * pixel;
         graphics_fill_rect(ctx, GRect(x, y, pixel, pixel), 0, GCornerNone);
       }
     }
@@ -323,6 +325,10 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
   }
 
+  // Scroll the entire plot under the fixed center selector.
+  int scroll_x = bounds.size.w / 2 - points[selected].x;
+  for (int i = 0; i < count; ++i) points[i].x += scroll_x;
+
   // White canvas, no area fill. Only the smoothed weight line is drawn
   // within the middle third of the display.
   graphics_context_set_fill_color(ctx, GColorWhite);
@@ -341,34 +347,21 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     previous_y = y;
   }
 
-  // Selected real measurement: thicker red ring with black center.
+  // Selector stays centered; only the plotted curve scrolls horizontally.
   GPoint marker = points[selected];
-
-  // Rotated DD.MM. date for older selections only. Pixel font is drawn
-  // directly at 90 degrees, avoiding an expensive rotated bitmap.
-  if (s_selected_history_offset > 0) {
-    int history_offset = s_selected_history_offset;
-    if (by_days) {
-      uint32_t today = get_current_date();
-      int seen = 0;
-      history_offset = -1;
-      for (int i = 0; i < get_history_count(); ++i) {
-        long age = days(get_history_date(i), today);
-        if (age < 0 || age >= range) continue;
-        if (seen++ == s_selected_history_offset) {
-          history_offset = i;
-          break;
-        }
-      }
-    }
-    if (history_offset >= 0 && history_offset < get_history_count()) {
-      uint32_t date = get_history_date(history_offset);
-      char short_date[8];
-      snprintf(short_date, sizeof(short_date), "%02lu.%02lu.",
-               (unsigned long)(date % 100),
-               (unsigned long)((date / 100) % 100));
-      draw_vertical_date(ctx, short_date, marker, bounds);
-    }
+  marker.x = bounds.size.w / 2;
+  int history_offset = visible_offset(s_selected_history_offset);
+  if (history_offset >= 0 && history_offset < get_history_count()) {
+    uint32_t date = get_history_date(history_offset);
+    char date_label[8];
+    snprintf(date_label, sizeof(date_label), "%02lu.%02lu.",
+             (unsigned long)(date % 100),
+             (unsigned long)((date / 100) % 100));
+    draw_vertical_label(ctx, date_label, marker, true);
+    char weight_label[16];
+    double_str(to_current_unit(get_history_weight(history_offset)),
+               weight_label, sizeof(weight_label) - 1);
+    draw_vertical_label(ctx, weight_label, marker, false);
   }
   graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_circle(ctx, marker, 8);
