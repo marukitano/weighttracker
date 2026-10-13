@@ -37,7 +37,6 @@ static int s_today;
 
 static Window *s_window;
 static TextLayer *s_textlayer_1;
-static TextLayer *s_textlayer_2;
 static Layer *s_chart;
 static Layer *s_button_marker;
 static AppTimer *s_button_anim_timer;
@@ -194,21 +193,12 @@ static void initialise_ui(void) {
   Layer *window_layer = window_get_root_layer(s_window);
   GRect bounds = layer_get_frame(window_layer);
 
-  // s_textlayer_2
-  s_textlayer_2 = text_layer_create(GRect(0, PBL_IF_ROUND_ELSE(14, 0), bounds.size.w, PBL_IF_ROUND_ELSE(24, 28)));
-  text_layer_set_background_color(s_textlayer_2, GColorClear);
-  text_layer_set_text_color(s_textlayer_2, FOREGROUND);
-  text_layer_set_text(s_textlayer_2, "");
-  text_layer_set_text_alignment(s_textlayer_2, GTextAlignmentCenter);
-  text_layer_set_font(s_textlayer_2, fonts_get_system_font(PBL_IF_ROUND_ELSE(FONT_KEY_GOTHIC_14_BOLD, FONT_KEY_GOTHIC_18_BOLD)));
-  layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_2);
-
   // The Time 2 (emery) has a 200x228 display. Give its chart the full
   // available width and height while retaining the original layout elsewhere.
   // draw_chart_callback derives its geometry from these layer bounds.
   // s_chart
 #ifdef PBL_PLATFORM_EMERY
-  s_chart = layer_create(GRect(0, 34, bounds.size.w - 36, bounds.size.h - 34));
+  s_chart = layer_create(GRect(0, 0, bounds.size.w - 36, bounds.size.h));
 #else
   s_chart = layer_create(GRect(PBL_IF_ROUND_ELSE((bounds.size.w - 144) / 2 - 4, 0), 40, 144, 110));
 #endif
@@ -236,14 +226,12 @@ static void initialise_ui(void) {
   layer_add_child(window_get_root_layer(s_window), s_button_marker);
 
 #ifdef PBL_ROUND
-  text_layer_enable_screen_text_flow_and_paging(s_textlayer_2, 2);
   text_layer_enable_screen_text_flow_and_paging(s_textlayer_1, 2);
 #endif
 }
 
 static void destroy_ui(void) {
   window_destroy(s_window);
-  text_layer_destroy(s_textlayer_2);
   layer_destroy(s_chart);
   if (s_button_anim_timer) {
     app_timer_cancel(s_button_anim_timer);
@@ -263,10 +251,6 @@ static void wakeup_handler(/* WakeupId id, int32_t reason */) {
 }
 
 void display_info(void) {
-  static char chart_title[40];
-  snprintf(chart_title, sizeof(chart_title), "Last %d %s",
-           get_chart_range(), get_chart_mode() ? "days" : "measurements");
-  text_layer_set_text(s_textlayer_2, chart_title);
   if (!s_slide_running) {
     if (s_history_offset >= get_chart_history_count()) s_history_offset = 0;
     set_chart_selected_history_offset(s_history_offset);
