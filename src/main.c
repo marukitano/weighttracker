@@ -42,13 +42,15 @@ static Layer *s_button_marker;
 static AppTimer *s_button_anim_timer;
 static uint8_t s_button_width[3] = {5, 5, 5};
 // 36px offscreen -> small overshoot -> settle, with staggered entrance.
-static int8_t s_button_enter_x[3] = {36, 36, 36};
+static int8_t s_button_enter_x[3] = {30, 30, 30};
 static uint8_t s_button_enter_frame[3] = {0, 0, 0};
 static bool s_button_entering[3] = {false, false, false};
 static AppTimer *s_button_enter_timer;
 static AppTimer *s_button_intro_timer;
 static bool s_buttons_introduced = false;
-static const int8_t BUTTON_BOUNCE_X[] = {36, 29, 19, 8, -4, -1, 2, 0};
+// Exact entry offsets and 42 ms cadence from Swiss-Chronograph
+// src/c/touch.c (s_control_bounce_offsets / RUN_CONTROLS_BOUNCE_MS).
+static const int8_t BUTTON_BOUNCE_X[] = {30, 18, 8, -3, 2, -1, 0};
 
 static int8_t s_active_button = -1;
 static bool s_button_held = false;
@@ -103,7 +105,7 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
-    if (s_button_enter_x[i] >= 36) continue;
+    if (s_button_enter_x[i] >= 30) continue;
     int shift = s_button_enter_x[i];
     int marker_width = s_button_width[i];
     graphics_fill_rect(ctx,
@@ -206,7 +208,7 @@ static void button_enter_tick(void *context) {
     else more = true;
   }
   if (s_button_marker) layer_mark_dirty(s_button_marker);
-  if (more) s_button_enter_timer = app_timer_register(40, button_enter_tick, NULL);
+  if (more) s_button_enter_timer = app_timer_register(42, button_enter_tick, NULL);
 }
 
 static void button_intro_tick(void *context) {
@@ -217,7 +219,7 @@ static void button_intro_tick(void *context) {
     s_button_enter_frame[i] = 0;
   }
   if (!s_button_enter_timer)
-    s_button_enter_timer = app_timer_register(40, button_enter_tick, NULL);
+    s_button_enter_timer = app_timer_register(42, button_enter_tick, NULL);
 }
 
 static void change_history(int direction) {
@@ -230,14 +232,14 @@ static void change_history(int direction) {
   if (s_chart) layer_mark_dirty(s_chart);
   s_slide_direction = direction;
   format_history_weight(target, s_new_weight_text, sizeof(s_new_weight_text));
-  if (target > 0 && s_button_enter_x[2] >= 36 && !s_button_entering[2]) {
+  if (target > 0 && s_button_enter_x[2] >= 30 && !s_button_entering[2]) {
     s_button_entering[2] = true;
     s_button_enter_frame[2] = 0;
     if (!s_button_enter_timer)
-      s_button_enter_timer = app_timer_register(40, button_enter_tick, NULL);
+      s_button_enter_timer = app_timer_register(42, button_enter_tick, NULL);
   } else if (target == 0) {
     s_button_entering[2] = false;
-    s_button_enter_x[2] = 36;
+    s_button_enter_x[2] = 30;
     if (s_button_marker) layer_mark_dirty(s_button_marker);
   }
   s_slide_running = true;
@@ -407,13 +409,13 @@ static void handle_window_appear(Window* window) {
   display_info();
   if (s_chart) layer_mark_dirty(s_chart);
   if (!s_buttons_introduced && !s_button_intro_timer)
-    s_button_intro_timer = app_timer_register(330, button_intro_tick, NULL);
+    s_button_intro_timer = app_timer_register(500, button_intro_tick, NULL);
 }
 
 static void show_main(void) {
   for (int i = 0; i < 3; ++i) {
     s_button_width[i] = 5;
-    s_button_enter_x[i] = 36;
+    s_button_enter_x[i] = 30;
     s_button_enter_frame[i] = 0;
     s_button_entering[i] = false;
   }
