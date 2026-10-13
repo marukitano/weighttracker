@@ -246,17 +246,10 @@ static void draw_clockwise_label(GContext *ctx, const char *label,
 static void draw_measurement_labels(GContext *ctx, GPoint marker,
                                     uint32_t date, double weight,
                                     int display_height) {
-  static const char *MONTHS[] = {
-    "Jan.", "Feb.", "Maerz", "Apr.", "Mai", "Juni",
-    "Juli", "Aug.", "Sep.", "Okt.", "Nov.", "Dez."
-  };
   int day = date % 100;
   int month = (date / 100) % 100;
   char date_text[24];
-  if (month >= 1 && month <= 12)
-    snprintf(date_text, sizeof(date_text), "%d. %s", day, MONTHS[month - 1]);
-  else
-    snprintf(date_text, sizeof(date_text), "%02d.%02d.", day, month);
+  snprintf(date_text, sizeof(date_text), "%d.%02d.", day, month);
 
   char number[16], weight_text[28];
   double_str(to_current_unit(weight), number, sizeof(number) - 1);
