@@ -91,9 +91,20 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
   show_input();
 }
 
+static void details_scroll(ClickRecognizerRef recognizer, void *context) {
+  if (!s_scrolllayer) return;
+  GPoint offset = scroll_layer_get_content_offset(s_scrolllayer);
+  ButtonId button = click_recognizer_get_button_id(recognizer);
+  offset.y += button == BUTTON_ID_UP ? 26 : -26;
+  scroll_layer_set_content_offset(s_scrolllayer, offset, true);
+}
+
 static void details_click_config(void *context) {
-  scroll_layer_set_click_config_onto_window(s_scrolllayer, s_window);
+  // Do NOT call scroll_layer_set_click_config_onto_window() here:
+  // it changes the window's click provider while that provider is executing.
+  window_single_repeating_click_subscribe(BUTTON_ID_UP, 150, details_scroll);
   window_single_click_subscribe(BUTTON_ID_SELECT, select_click_handler);
+  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 150, details_scroll);
 }
 
 static void refresh_details(void) {
