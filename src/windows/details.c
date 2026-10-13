@@ -61,12 +61,9 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int centers[3] = {36, bounds.size.h / 2, bounds.size.h - 36};
   const int right = bounds.size.w;
+  // Transparent side overlay: only the black tabs and icons remain.
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(0, 0, 2, bounds.size.h), 0, GCornerNone);
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
   for (int i = 0; i < 3; ++i) {
     graphics_fill_rect(ctx, GRect(right - 5, centers[i] - 26, 5, 52),
@@ -139,13 +136,13 @@ static void initialise_ui(void) {
   window_set_background_color(s_window, BACKGROUND);
   Layer *root = window_get_root_layer(s_window);
   GRect bounds = layer_get_bounds(root);
-  int list_width = bounds.size.w - RAIL_WIDTH;
+  int list_width = bounds.size.w;
   s_scrolllayer = scroll_layer_create(GRect(0, 0, list_width, bounds.size.h));
   s_list_layer = layer_create(GRect(0, 0, list_width, ROW_HEIGHT));
   layer_set_update_proc(s_list_layer, list_draw);
   scroll_layer_add_child(s_scrolllayer, s_list_layer);
   layer_add_child(root, scroll_layer_get_layer(s_scrolllayer));
-  s_button_marker = layer_create(GRect(list_width, 0, RAIL_WIDTH, bounds.size.h));
+  s_button_marker = layer_create(GRect(bounds.size.w - RAIL_WIDTH, 0, RAIL_WIDTH, bounds.size.h));
   layer_set_update_proc(s_button_marker, button_marker_update);
   layer_add_child(root, s_button_marker);
   refresh_details();
