@@ -318,20 +318,26 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
       ++segment;
     int y = smooth_curve_y(points, count, segment, x);
     if (use_bmi) {
-      // Draw contiguous vertical runs for each zone rather than colouring
-      // entire data points: a threshold can cross in the middle of a segment.
-      int start = y;
-      int band = bmi_band(weight_at_y(y, min_weight, max_weight, top, height));
-      for (int yy = y + 1; yy <= fill_bottom + 1; ++yy) {
-        int next = yy <= fill_bottom
-          ? bmi_band(weight_at_y(yy, min_weight, max_weight, top, height))
-          : -1;
-        if (next != band) {
+      // Split each column only at actual BMI threshold pixels. This is
+      // substantially cheaper on a watch than iterating over every pixel.
+      double meters = chart_prefs_height_cm() / 100.0;
+      const double bmi_limits[3] = {30.0, 25.0, 18.5};
+      int run_start = y;
+      for (int k = 0; k < 4; ++k) {
+        int run_end = fill_bottom;
+        if (k < 3) {
+          double threshold = to_current_unit(bmi_limits[k] * meters * meters);
+          int boundary = chart_y(threshold, min_weight, max_weight, top, height);
+          if (boundary < run_start) continue;
+          if (boundary < run_end) run_end = boundary;
+        }
+        if (run_end >= run_start) {
+          int mid = (run_start + run_end) / 2;
+          int band = bmi_band(weight_at_y(mid, min_weight, max_weight, top, height));
           graphics_context_set_stroke_color(ctx, band_fill(band));
           graphics_context_set_stroke_width(ctx, 1);
-          graphics_draw_line(ctx, GPoint(x, start), GPoint(x, yy - 1));
-          start = yy;
-          band = next;
+          graphics_draw_line(ctx, GPoint(x, run_start), GPoint(x, run_end));
+          run_start = run_end + 1;
         }
       }
     } else {
@@ -341,7 +347,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     }
     graphics_context_set_stroke_color(ctx,
       use_bmi ? band_stroke(bmi_band(weight_at_y(y, min_weight, max_weight, top, height)))
-              : CHARTCOLOR);
+              : chart_prefs_line_color());
     graphics_context_set_stroke_width(ctx, 2);
     if (x > points[0].x)
       graphics_draw_line(ctx, GPoint(x - 1, previous_y), GPoint(x, y));
