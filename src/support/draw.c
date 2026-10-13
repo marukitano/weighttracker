@@ -220,10 +220,10 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   for (int i = 1; i < count; ++i)
     graphics_draw_line(ctx, points[i - 1], points[i]);
 
-  // Selected real measurement: white core with a 2px red ring.
+  // Selected real measurement: thicker red ring with black center.
   GPoint marker = points[selected];
   graphics_context_set_fill_color(ctx, GColorRed);
-  graphics_fill_circle(ctx, marker, 7);
-  graphics_context_set_fill_color(ctx, FOREGROUND);
-  graphics_fill_circle(ctx, marker, 5);
+  graphics_fill_circle(ctx, marker, 8);
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_circle(ctx, marker, 4);
 }
