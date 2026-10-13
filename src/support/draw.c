@@ -245,6 +245,23 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
   }
 
+  // Under the curve the chart is pure black. Above it, mix the
+  // palette's darkest gray with black for an even darker charcoal shade.
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  graphics_context_set_fill_color(ctx, GColorDarkGray);
+  for (int i = 1; i < count; ++i) {
+    GPoint a = points[i - 1], b = points[i];
+    if (b.x <= a.x) continue;
+    for (int x = a.x; x <= b.x; x += 2) {
+      int curve_y = a.y + (int)((int32_t)(b.y - a.y) * (x - a.x) / (b.x - a.x));
+      for (int y = 0; y + 1 < curve_y; y += 2) {
+        if ((((x / 2) + (y / 2)) & 1) == 0)
+          graphics_fill_rect(ctx, GRect(x, y, 2, 2), 0, GCornerNone);
+      }
+    }
+  }
+
   for (int i = 1; i < count; ++i)
     draw_dithered_segment(ctx, points[i - 1], points[i], fill_bottom, left, width);
 
