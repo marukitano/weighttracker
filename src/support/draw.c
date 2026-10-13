@@ -222,6 +222,49 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
 
   // Selected real measurement: thicker red ring with black center.
   GPoint marker = points[selected];
+
+  // For older selections, show the measurement date as a compact vertical
+  // three-line label above the marker. The newest point stays unlabelled.
+  if (s_selected_history_offset > 0) {
+    int history_offset = s_selected_history_offset;
+    if (by_days) {
+      // Map the selected date within the calendar window back to the archive.
+      uint32_t today = get_current_date();
+      int seen = 0;
+      history_offset = -1;
+      for (int i = 0; i < get_history_count(); ++i) {
+        long age = days(get_history_date(i), today);
+        if (age < 0 || age >= range) continue;
+        if (seen++ == s_selected_history_offset) {
+          history_offset = i;
+          break;
+        }
+      }
+    }
+    if (history_offset >= 0 && history_offset < get_history_count()) {
+      uint32_t date = get_history_date(history_offset);
+      char day[5], month[5], year[8];
+      snprintf(day, sizeof(day), "%02lu.", (unsigned long)(date % 100));
+      snprintf(month, sizeof(month), "%02lu.", (unsigned long)((date / 100) % 100));
+      snprintf(year, sizeof(year), "%04lu", (unsigned long)(date / 10000));
+      // Keep the label inside the drawing area, even near screen edges.
+      const int label_width = 44;
+      int label_x = marker.x - label_width / 2;
+      if (label_x < 0) label_x = 0;
+      if (label_x + label_width > bounds.size.w)
+        label_x = bounds.size.w - label_width;
+      int label_y = marker.y - 62;
+      if (label_y < 0) label_y = 0;
+      graphics_context_set_text_color(ctx, GColorWhite);
+      GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+      graphics_draw_text(ctx, day, font, GRect(label_x, label_y, label_width, 18),
+                         GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+      graphics_draw_text(ctx, month, font, GRect(label_x, label_y + 15, label_width, 18),
+                         GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+      graphics_draw_text(ctx, year, font, GRect(label_x, label_y + 30, label_width, 18),
+                         GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+    }
+  }
   graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_circle(ctx, marker, 8);
   graphics_context_set_fill_color(ctx, GColorBlack);
