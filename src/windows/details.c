@@ -110,12 +110,17 @@ static void details_click_config(void *context) {
 static void refresh_details(void) {
   prepare_content();
   if (!s_textlayer_1 || !s_scrolllayer) return;
+  // Reserve space for the entire history, including same-day entries.
+  // Avoid re-measuring a text layer that may already have been clipped.
+  int lines = get_history_count();
+  if (lines < 1) lines = 1;
+  int height = lines * 28 + TEXT_PADDING + VERT_SCROLL_TEXT_PADDING;
+  if (height > MAX_TEXT_LAYER_SIZE) height = MAX_TEXT_LAYER_SIZE;
+  GRect frame = layer_get_frame(text_layer_get_layer(s_textlayer_1));
+  text_layer_set_size(s_textlayer_1, GSize(frame.size.w, height));
   text_layer_set_text(s_textlayer_1, details);
-  GSize size = text_layer_get_content_size(s_textlayer_1);
-  size.h += TEXT_PADDING;
-  text_layer_set_size(s_textlayer_1, size);
-  scroll_layer_set_content_size(s_scrolllayer,
-                                GSize(size.w, size.h + VERT_SCROLL_TEXT_PADDING));
+  scroll_layer_set_content_size(s_scrolllayer, GSize(frame.size.w, height));
+  scroll_layer_set_content_offset(s_scrolllayer, GPoint(0, 0), false);
 }
 
 // Setup the scroll layer on window load
@@ -167,17 +172,7 @@ static void initialise_ui() {
   layer_set_update_proc(s_button_marker, button_marker_update);
   layer_add_child(window_layer, s_button_marker);
 
-#ifdef PBL_ROUND
-  //text_layer_enable_screen_text_flow_and_paging(s_textlayer_2, 4);
-  text_layer_enable_screen_text_flow_and_paging(s_textlayer_1, 4);
-  scroll_layer_set_content_size(s_scrolllayer, text_layer_get_content_size(s_textlayer_1));
-  scroll_layer_set_paging(s_scrolllayer, true);
-#else
-  GSize max_size = text_layer_get_content_size(s_textlayer_1);
-  max_size.h = max_size.h + TEXT_PADDING;
-  text_layer_set_size(s_textlayer_1, max_size);
-  scroll_layer_set_content_size(s_scrolllayer, GSize(bounds.size.w, max_size.h + VERT_SCROLL_TEXT_PADDING));
-#endif
+  refresh_details();
 }
 
 static void destroy_ui() {
