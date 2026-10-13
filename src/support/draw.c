@@ -329,19 +329,13 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   int segment = 0;
   int previous_y = points[0].y;
-  bool use_bmi = chart_prefs_color_mode() == 0 &&
-                 chart_prefs_height_cm() >= 100;
   for (int x = points[0].x; x <= points[count - 1].x; ++x) {
     while (segment + 2 < count && x > points[segment + 1].x) ++segment;
     int y = smooth_curve_y(points, count, segment, x);
     if (x > points[0].x) {
       // Split line at every vertical BMI color transition (when enabled).
-      GColor color = use_bmi
-        ? band_stroke(bmi_band(weight_at_y((previous_y + y) / 2,
-                                             min_weight, max_weight, top, height)))
-        : chart_prefs_line_color();
-      graphics_context_set_stroke_color(ctx, color);
-      graphics_context_set_stroke_width(ctx, 2);
+      graphics_context_set_stroke_color(ctx, GColorRed);
+      graphics_context_set_stroke_width(ctx, 3);
       graphics_draw_line(ctx, GPoint(x - 1, previous_y), GPoint(x, y));
     }
     previous_y = y;
@@ -376,7 +370,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
       draw_vertical_date(ctx, short_date, marker, bounds);
     }
   }
-  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_circle(ctx, marker, 8);
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_circle(ctx, marker, 4);
