@@ -249,10 +249,9 @@ static void draw_measurement_labels(GContext *ctx, GPoint marker,
 
   char number[16], weight_text[28];
   double_str(to_current_unit(weight), number, sizeof(number) - 1);
-  snprintf(weight_text, sizeof(weight_text), "%s %s", number,
-           get_short_unit_name());
+  snprintf(weight_text, sizeof(weight_text), "%s", number);
   draw_clockwise_label(ctx, date_text, marker.x, marker.y - 15,
-                       1, true, display_height);
+                       2, true, display_height);
   draw_clockwise_label(ctx, weight_text, marker.x, marker.y + 15,
                        2, false, display_height);
 }
