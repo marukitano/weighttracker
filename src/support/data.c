@@ -121,6 +121,30 @@ static uint32_t s_latest_date;
 static int32_t s_reminder_pin_id;
 static int32_t s_measurement_pin_id;
 
+// Update an existing archive entry without changing its date or order.
+bool update_history_weight(int newest_offset, double weight) {
+  int index = s_history_count - 1 - newest_offset;
+  if (index < 0 || index >= s_history_count || weight <= 0) return false;
+  uint32_t date = s_history[index].date;
+  int32_t old_value = s_history[index].weight_10000;
+  s_history[index].weight_10000 = (int32_t)(weight * 10000.0 + 0.5);
+
+  // Keep the latest reading and the legacy daily cache in sync.
+  if (newest_offset == 0) {
+    s_current_weight = weight;
+    s_current_date = date;
+  }
+  // This cache stores one value per day: only update it if it refers
+  // to the old weight rather than a different reading on the same day.
+  for (int i = 0; i < NUM_OF_DAYS; ++i) {
+    if (data[i].measured && data[i].date == date &&
+        (int32_t)(data[i].weight * 10000.0 + 0.5) == old_value)
+      data[i].weight = weight;
+  }
+  history_save();
+  return true;
+}
+
 int32_t get_current_pin_id(PinType pt) {
   if (pt == MEASUREMENT) {
     return s_measurement_pin_id;
