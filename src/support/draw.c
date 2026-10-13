@@ -171,9 +171,70 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
   }
 }
 
-// Standard Pebble fonts keep labels upright and legible.
+// 5x7 glyphs. Rotate the ENTIRE line clockwise, not individual glyphs.
+// This keeps letters and digits readable when the wrist is turned.
+static const uint8_t ROTATED_GLYPHS[][7] = {
+  {14,17,19,21,25,17,14}, // 0
+  {4,12,4,4,4,4,14},       // 1
+  {14,17,1,2,4,8,31},      // 2
+  {30,1,1,14,1,1,30},      // 3
+  {2,6,10,18,31,2,2},      // 4
+  {31,16,16,30,1,1,30},    // 5
+  {14,16,16,30,17,17,14},  // 6
+  {31,1,2,4,8,8,8},        // 7
+  {14,17,17,14,17,17,14},  // 8
+  {14,17,17,15,1,1,14},    // 9
+  {0,0,0,0,0,12,12},       // .
+  {0,0,0,0,0,0,0},         // space
+  {14,17,17,17,17,17,14}, // O
+  {16,16,18,20,24,20,18}, // k
+  {4,4,31,4,4,4,3},       // t
+  {0,15,17,17,15,1,14},   // g
+  {16,16,18,20,24,20,18}  // K
+};
+
+static int vertical_glyph_index(char ch) {
+  if (ch >= '0' && ch <= '9') return ch - '0';
+  if (ch == '.') return 10;
+  if (ch == ' ') return 11;
+  if (ch == 'O') return 12;
+  if (ch == 'k') return 13;
+  if (ch == 't') return 14;
+  if (ch == 'g') return 15;
+  if (ch == 'K') return 16;
+  return 11;
+}
+
+// Whole horizontal string turned 90 degrees clockwise:
+// a source pixel (u, v) becomes (height - 1 - v, u).
+static void draw_clockwise_label(GContext *ctx, const char *label,
+                                 int center_x, int anchor_y,
+                                 int scale, bool above, int display_height) {
+  int count = 0;
+  while (label[count] && count < 20) ++count;
+  int total = count * 6 * scale;
+  int y0 = above ? anchor_y - total : anchor_y;
+  if (y0 < 0) y0 = 0;
+  if (y0 + total > display_height) y0 = display_height - total;
+  if (y0 < 0) y0 = 0;
+  int x0 = center_x - (7 * scale) / 2;
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  for (int c = 0; c < count; ++c) {
+    const uint8_t *glyph = ROTATED_GLYPHS[vertical_glyph_index(label[c])];
+    for (int v = 0; v < 7; ++v) {
+      for (int u = 0; u < 5; ++u) {
+        if (!(glyph[v] & (1 << (4 - u)))) continue;
+        graphics_fill_rect(ctx,
+          GRect(x0 + (6 - v) * scale, y0 + (c * 6 + u) * scale,
+                scale, scale), 0, GCornerNone);
+      }
+    }
+  }
+}
+
 static void draw_measurement_labels(GContext *ctx, GPoint marker,
-                                    uint32_t date, double weight) {
+                                    uint32_t date, double weight,
+                                    int display_height) {
   static const char *MONTHS[] = {
     "Jan.", "Feb.", "Maerz", "Apr.", "Mai", "Juni",
     "Juli", "Aug.", "Sep.", "Okt.", "Nov.", "Dez."
@@ -190,18 +251,10 @@ static void draw_measurement_labels(GContext *ctx, GPoint marker,
   double_str(to_current_unit(weight), number, sizeof(number) - 1);
   snprintf(weight_text, sizeof(weight_text), "%s %s", number,
            get_short_unit_name());
-
-  graphics_context_set_text_color(ctx, GColorBlack);
-  graphics_draw_text(ctx, date_text,
-                     fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-                     GRect(marker.x - 85, marker.y - 47, 170, 32),
-                     GTextOverflowModeTrailingEllipsis,
-                     GTextAlignmentCenter, NULL);
-  graphics_draw_text(ctx, weight_text,
-                     fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK),
-                     GRect(marker.x - 94, marker.y + 14, 188, 47),
-                     GTextOverflowModeTrailingEllipsis,
-                     GTextAlignmentCenter, NULL);
+  draw_clockwise_label(ctx, date_text, marker.x, marker.y - 15,
+                       1, true, display_height);
+  draw_clockwise_label(ctx, weight_text, marker.x, marker.y + 15,
+                       2, false, display_height);
 }
 
 // The color regions are defined by weight thresholds, not by individual
@@ -352,7 +405,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   int history_offset = visible_offset(s_selected_history_offset);
   if (history_offset >= 0 && history_offset < get_history_count()) {
     draw_measurement_labels(ctx, marker, get_history_date(history_offset),
-                            get_history_weight(history_offset));
+                            get_history_weight(history_offset), bounds.size.h);
   }
   graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_circle(ctx, marker, 8);
