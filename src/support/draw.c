@@ -85,6 +85,39 @@ static int chart_y(double value, double minimum, double maximum, int top, int he
   return top + height - (int)(fraction * height * s_multiplier);
 }
 
+// Shape-preserving cubic interpolation: smooth at readings, with no
+// overshoot between consecutive measurements.
+static int smooth_curve_y(const GPoint *p, int count, int seg, int x) {
+  GPoint a = p[seg], b = p[seg + 1];
+  int dx = b.x - a.x;
+  if (dx <= 0) return a.y;
+  double slope = (double)(b.y - a.y) / dx;
+  double m0 = slope, m1 = slope;
+  if (seg > 0) {
+    int prev_dx = a.x - p[seg - 1].x;
+    if (prev_dx > 0) {
+      double prev = (double)(a.y - p[seg - 1].y) / prev_dx;
+      m0 = prev * slope > 0 ? 2.0 * prev * slope / (prev + slope) : 0;
+    }
+  }
+  if (seg + 2 < count) {
+    int next_dx = p[seg + 2].x - b.x;
+    if (next_dx > 0) {
+      double next = (double)(p[seg + 2].y - b.y) / next_dx;
+      m1 = next * slope > 0 ? 2.0 * next * slope / (next + slope) : 0;
+    }
+  }
+  double t = (double)(x - a.x) / dx;
+  double t2 = t * t, t3 = t2 * t;
+  double y = (2*t3 - 3*t2 + 1)*a.y + (t3 - 2*t2 + t)*dx*m0
+           + (-2*t3 + 3*t2)*b.y + (t3 - t2)*dx*m1;
+  int low = a.y < b.y ? a.y : b.y;
+  int high = a.y > b.y ? a.y : b.y;
+  if (y < low) y = low;
+  if (y > high) y = high;
+  return (int)(y + 0.5);
+}
+
 // Same 2x2-pixel Bayer dither and density formula as OpenLibreLinkUp.
 // Pulse travels from right to left without changing the underlying gradient.
 static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
@@ -245,24 +278,25 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
   }
 
-  // Dark gray above the curve; fully opaque dark red below it.
+  // Draw the filled area and the outline from the same smooth curve.
   graphics_context_set_fill_color(ctx, GColorDarkGray);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  graphics_context_set_stroke_color(ctx, CHARTFILL);
   graphics_context_set_stroke_width(ctx, 1);
-  for (int i = 1; i < count; ++i) {
-    GPoint a = points[i - 1], b = points[i];
-    if (b.x <= a.x) continue;
-    for (int x = a.x; x <= b.x; ++x) {
-      int curve_y = a.y + (int)((int32_t)(b.y - a.y) * (x - a.x) / (b.x - a.x));
-      graphics_draw_line(ctx, GPoint(x, curve_y), GPoint(x, fill_bottom));
-    }
+  int segment = 0;
+  int previous_y = points[0].y;
+  for (int x = points[0].x; x <= points[count - 1].x; ++x) {
+    while (segment + 2 < count && x > points[segment + 1].x)
+      ++segment;
+    int y = smooth_curve_y(points, count, segment, x);
+    graphics_context_set_stroke_color(ctx, CHARTFILL);
+    graphics_draw_line(ctx, GPoint(x, y), GPoint(x, fill_bottom));
+    graphics_context_set_stroke_color(ctx, CHARTCOLOR);
+    graphics_context_set_stroke_width(ctx, 2);
+    if (x > points[0].x)
+      graphics_draw_line(ctx, GPoint(x - 1, previous_y), GPoint(x, y));
+    previous_y = y;
+    graphics_context_set_stroke_width(ctx, 1);
   }
-
-  graphics_context_set_stroke_color(ctx, CHARTCOLOR);
-  graphics_context_set_stroke_width(ctx, 2);
-  for (int i = 1; i < count; ++i)
-    graphics_draw_line(ctx, points[i - 1], points[i]);
 
   // Selected real measurement: thicker red ring with black center.
   GPoint marker = points[selected];
