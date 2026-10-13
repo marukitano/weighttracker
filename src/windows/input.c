@@ -22,6 +22,9 @@ static Layer *s_inputlayer;
 static ActionBarLayer *s_actionbarlayer;
 static AppTimer *s_controls_timer;
 static AppTimer *s_controls_delay;
+static AppTimer *s_controls_press_timer;
+static AppTimer *s_save_timer;
+static bool s_controls_pressed;
 static uint8_t s_controls_step;
 static int16_t s_controls_offset = 30;
 static GRect s_controls_frame;
@@ -33,7 +36,7 @@ static void controls_bounce_tick(void *context) {
   if (s_controls_step < sizeof(s_controls_bounce) - 1) ++s_controls_step;
   s_controls_offset = s_controls_bounce[s_controls_step];
   layer_set_frame(action_bar_layer_get_layer(s_actionbarlayer),
-                  GRect(s_controls_frame.origin.x + s_controls_offset,
+                  GRect(s_controls_frame.origin.x + s_controls_offset - (s_controls_pressed ? 2 : 0),
                         s_controls_frame.origin.y,
                         s_controls_frame.size.w, s_controls_frame.size.h));
   if (s_controls_step < sizeof(s_controls_bounce) - 1)
@@ -50,12 +53,29 @@ static void controls_appear(Window *window) {
 }
 
 
-static char* selection_handle_get_text(int index, void *context) {
-  double_str(s_weight, s_weigth_str, sizeof(s_weigth_str));
-  return s_weigth_str;
+static void controls_set_press(bool pressed) {
+  if (!s_actionbarlayer) return;
+  s_controls_pressed = pressed;
+  layer_set_frame(action_bar_layer_get_layer(s_actionbarlayer),
+                  GRect(s_controls_frame.origin.x + s_controls_offset
+                            - (pressed ? 2 : 0),
+                        s_controls_frame.origin.y,
+                        s_controls_frame.size.w, s_controls_frame.size.h));
 }
-
-static void selection_handle_complete(void *context) {
+static void controls_release(void *context) {
+  s_controls_press_timer = NULL;
+  controls_set_press(false);
+}
+static void controls_press(void) {
+  if (s_controls_press_timer) {
+    app_timer_cancel(s_controls_press_timer);
+    s_controls_press_timer = NULL;
+  }
+  controls_set_press(true);
+  s_controls_press_timer = app_timer_register(110, controls_release, NULL);
+}
+static void save_after_press(void *context) {
+  s_save_timer = NULL;
   if (s_edit_offset >= 0)
     update_history_weight(s_edit_offset, from_current_unit(s_weight));
   else
@@ -63,13 +83,26 @@ static void selection_handle_complete(void *context) {
   hide_input();
 }
 
+static char* selection_handle_get_text(int index, void *context) {
+  double_str(s_weight, s_weigth_str, sizeof(s_weigth_str));
+  return s_weigth_str;
+}
+
+static void selection_handle_complete(void *context) {
+  controls_press();
+  if (!s_save_timer)
+    s_save_timer = app_timer_register(110, save_after_press, NULL);
+}
+
 static void selection_handle_dec(int index, uint8_t clicks, void *context) {
+  controls_press();
   if (s_weight > 0.0) {
     s_weight -= get_accuracy_step();
   }
 }
 
 static void selection_handle_inc(int index, uint8_t clicks, void *context) {
+  controls_press();
   s_weight += get_accuracy_step();
 }
 
@@ -136,6 +169,9 @@ static void initialise_ui(void) {
 static void destroy_ui(void) {
   if (s_controls_delay) { app_timer_cancel(s_controls_delay); s_controls_delay = NULL; }
   if (s_controls_timer) { app_timer_cancel(s_controls_timer); s_controls_timer = NULL; }
+  if (s_controls_press_timer) { app_timer_cancel(s_controls_press_timer); s_controls_press_timer = NULL; }
+  if (s_save_timer) { app_timer_cancel(s_save_timer); s_save_timer = NULL; }
+  s_actionbarlayer = NULL;
   window_destroy(s_window);
   text_layer_destroy(s_titlelayer);
   text_layer_destroy(s_edit_date_layer);
