@@ -30,9 +30,9 @@ static void list_draw(Layer *layer, GContext *ctx) {
     }
     graphics_context_set_text_color(ctx, active ? GColorBlack : GColorWhite);
     if (i == 0) {
-      graphics_draw_text(ctx, "+", fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-                         GRect(8, y, bounds.size.w - 12, ROW_HEIGHT),
-                         GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+      graphics_draw_text(ctx, "+", fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD),
+                         GRect(0, y - 3, bounds.size.w, ROW_HEIGHT + 6),
+                         GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
       continue;
     }
     int history_offset = i - 1;
