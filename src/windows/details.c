@@ -39,10 +39,16 @@ static void prepare_content(void) {
     uint32_t date = get_history_date(i);
     double weight = get_history_weight(i);
     if (date == 0 || weight <= 0) continue;
-    date_str(date, date_s, DATE_LENGTH);
+    // Fixed day.month.year presentation for the measurements list.
+    snprintf(date_s, sizeof(date_s), "%02lu.%02lu.%04lu",
+             (unsigned long)(date % 100),
+             (unsigned long)((date / 100) % 100),
+             (unsigned long)(date / 10000));
     double_str(to_current_unit(weight), weight_s, WEIGHT_LENGTH);
-    snprintf(line, sizeof(line), "- %s: %s %s",
-             date_s, weight_s, get_short_unit_name());
+    // Archive access is newest-first; append in the same order.
+    snprintf(line, sizeof(line), "%s  %s %s",
+             date_s, weight_s,
+             get_current_unit_index() == 0 ? "kg" : get_short_unit_name());
 
     size_t used = strlen(details);
     size_t needed = strlen(line) + (first ? 0 : 1);
