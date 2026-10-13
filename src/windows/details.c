@@ -15,6 +15,7 @@ static Window *s_window;
 static ScrollLayer *s_scrolllayer;
 static Layer *s_list_layer;
 static Layer *s_button_marker;
+static Layer *s_back_marker;
 static int s_selected = 0;
 static AppTimer *s_entry_timer;
 static AppTimer *s_press_timer;
@@ -31,6 +32,7 @@ static void entry_tick(void *context) {
   if (s_entry_step < sizeof(s_bounce_offsets) - 1) ++s_entry_step;
   s_entry_shift = s_bounce_offsets[s_entry_step];
   if (s_button_marker) layer_mark_dirty(s_button_marker);
+  if (s_back_marker) layer_mark_dirty(s_back_marker);
   if (s_entry_step < sizeof(s_bounce_offsets) - 1)
     s_entry_timer = app_timer_register(42, entry_tick, NULL);
 }
@@ -150,6 +152,20 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   }
 }
 
+// Mirrored Swiss Chronograph back button, 36px from top, 5x52px.
+static void back_marker_update(Layer *layer, GContext *ctx) {
+  if (s_entry_shift >= 30) return;
+  int cx = 15 - s_entry_shift, cy = 36;
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, GRect(0, 10, 5, 52), 5, GCornersRight);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_stroke_width(ctx, 2);
+  // Return arrow points left (not an X).
+  graphics_draw_line(ctx, GPoint(cx + 6, cy), GPoint(cx - 5, cy));
+  graphics_draw_line(ctx, GPoint(cx - 5, cy), GPoint(cx + 1, cy - 6));
+  graphics_draw_line(ctx, GPoint(cx - 5, cy), GPoint(cx + 1, cy + 6));
+}
+
 static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (s_selected == 0) show_input();
   else show_input_edit(s_selected - 1);
@@ -215,6 +231,9 @@ static void initialise_ui(void) {
   s_button_marker = layer_create(GRect(bounds.size.w - RAIL_WIDTH, 0, RAIL_WIDTH, bounds.size.h));
   layer_set_update_proc(s_button_marker, button_marker_update);
   layer_add_child(root, s_button_marker);
+  s_back_marker = layer_create(GRect(0, 0, RAIL_WIDTH, bounds.size.h));
+  layer_set_update_proc(s_back_marker, back_marker_update);
+  layer_add_child(root, s_back_marker);
   refresh_details();
 }
 
@@ -231,10 +250,12 @@ static void handle_window_unload(Window *window) {
   layer_destroy(s_list_layer);
   scroll_layer_destroy(s_scrolllayer);
   layer_destroy(s_button_marker);
+  layer_destroy(s_back_marker);
   s_window = NULL;
   s_scrolllayer = NULL;
   s_list_layer = NULL;
   s_button_marker = NULL;
+  s_back_marker = NULL;
 }
 
 void show_details(void) {
