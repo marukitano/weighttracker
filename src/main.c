@@ -39,6 +39,7 @@ static Window *s_window;
 static TextLayer *s_textlayer_1;
 static Layer *s_chart;
 static Layer *s_button_marker;
+static Layer *s_back_marker;
 static AppTimer *s_button_anim_timer;
 static uint8_t s_button_width[3] = {5, 5, 5};
 // 36px offscreen -> small overshoot -> settle, with staggered entrance.
@@ -133,6 +134,20 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   }
 }
 
+// Swiss Chronograph: left-edge action at y=36, 5x52px, right-rounded.
+// Mirror the right-hand button bounce so the back action flies in from left.
+static void back_marker_update(Layer *layer, GContext *ctx) {
+  if (s_button_enter_x[0] >= 30) return;
+  int shift = s_button_enter_x[0];
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, GRect(0, 10, 5, 52), 5, GCornersRight);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_stroke_width(ctx, 2);
+  int cx = 15 - shift, cy = 36;
+  graphics_draw_line(ctx, GPoint(cx - 5, cy - 5), GPoint(cx + 5, cy + 5));
+  graphics_draw_line(ctx, GPoint(cx - 5, cy + 5), GPoint(cx + 5, cy - 5));
+}
+
 // Two independent weight captions slide through a clipped display window.
 static void format_history_weight(int offset, char *out, size_t len) {
   double value = get_chart_history_weight(offset);
@@ -208,6 +223,7 @@ static void button_enter_tick(void *context) {
     else more = true;
   }
   if (s_button_marker) layer_mark_dirty(s_button_marker);
+  if (s_back_marker) layer_mark_dirty(s_back_marker);
   if (more) s_button_enter_timer = app_timer_register(42, button_enter_tick, NULL);
 }
 
@@ -284,6 +300,9 @@ static void initialise_ui(void) {
   s_button_marker = layer_create(GRect(bounds.size.w - 36, 0, 36, bounds.size.h));
   layer_set_update_proc(s_button_marker, button_marker_update);
   layer_add_child(window_get_root_layer(s_window), s_button_marker);
+  s_back_marker = layer_create(GRect(0, 0, 36, bounds.size.h));
+  layer_set_update_proc(s_back_marker, back_marker_update);
+  layer_add_child(window_get_root_layer(s_window), s_back_marker);
 
 #ifdef PBL_ROUND
   text_layer_enable_screen_text_flow_and_paging(s_textlayer_1, 2);
@@ -306,6 +325,8 @@ static void destroy_ui(void) {
     s_button_anim_timer = NULL;
   }
   layer_destroy(s_button_marker);
+  layer_destroy(s_back_marker);
+  s_back_marker = NULL;
   if (s_weight_animation_timer) {
     app_timer_cancel(s_weight_animation_timer);
     s_weight_animation_timer = NULL;
