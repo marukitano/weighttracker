@@ -148,7 +148,7 @@ static void draw_vertical_date(GContext *ctx, const char *label,
   int x0 = marker.x - 5;
   if (x0 < 0) x0 = 0;
   if (x0 > bounds.size.w - 10) x0 = bounds.size.w - 10;
-  int bottom = marker.y - 12;
+  int bottom = marker.y - 14;
   if (bottom < total_height) bottom = total_height;
   graphics_context_set_fill_color(ctx, GColorWhite);
   for (int c = 0; label[c] && c < 6; ++c) {
