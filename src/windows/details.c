@@ -6,63 +6,56 @@
 #include "../windows/details.h"
 #include "../windows/input.h"
 
-#define DETAILS_LENGTH 4800
-#define LINE_LENGTH 64
-#define DATE_LENGTH 15
-#define WEIGHT_LENGTH 10
-
-static const int VERT_SCROLL_TEXT_PADDING = 4;
-static const int TEXT_PADDING = 4;
-#ifdef PBL_ROUND
-static const int SCROLL_LAYER_MARGIN = 32;
-#endif
-static const int MAX_TEXT_LAYER_SIZE = 3200;
-
-static char details[DETAILS_LENGTH + 1] = "";
+#define RAIL_WIDTH 36
+#define ROW_HEIGHT 30
+#define ROW_TEXT_Y 5
+#define MAX_LIST_HEIGHT (HISTORY_CAPACITY * ROW_HEIGHT)
 
 static Window *s_window;
 static ScrollLayer *s_scrolllayer;
-static TextLayer *s_textlayer_1;
+static Layer *s_list_layer;
 static Layer *s_button_marker;
-//static TextLayer *s_textlayer_2;
+static int s_selected = 0;
 
-static void prepare_content(void) {
-  bool first = true;
-  int i;
-  static char date_s[DATE_LENGTH + 1];
-  static char weight_s[WEIGHT_LENGTH + 1];
-  static char line[LINE_LENGTH + 1] = "";
-  details[0] = '\0';
-
-  // Include measurements older than the legacy 30-day calendar window.
-  for (i = 0; i < get_history_count(); ++i) {
+static void list_draw(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  int count = get_history_count();
+  if (!count) {
+    graphics_context_set_text_color(ctx, GColorWhite);
+    graphics_draw_text(ctx, "No measurements", fonts_get_system_font(FONT_KEY_GOTHIC_18),
+                       GRect(4, 5, bounds.size.w - 8, 30),
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+    return;
+  }
+  for (int i = 0; i < count; ++i) {
+    int y = i * ROW_HEIGHT;
+    bool active = i == s_selected;
+    if (active) {
+      graphics_context_set_fill_color(ctx, GColorRed);
+      graphics_fill_rect(ctx, GRect(0, y, bounds.size.w, ROW_HEIGHT),
+                         0, GCornerNone);
+    }
+    graphics_context_set_text_color(ctx, active ? GColorBlack : GColorWhite);
     uint32_t date = get_history_date(i);
-    double weight = get_history_weight(i);
-    if (date == 0 || weight <= 0) continue;
-    // Fixed day.month.year presentation for the measurements list.
-    snprintf(date_s, sizeof(date_s), "%02lu.%02lu.%04lu",
+    char date_str_buf[16];
+    char weight_str[16];
+    char value_str[24];
+    snprintf(date_str_buf, sizeof(date_str_buf), "%02lu.%02lu.%04lu",
              (unsigned long)(date % 100),
              (unsigned long)((date / 100) % 100),
              (unsigned long)(date / 10000));
-    double_str(to_current_unit(weight), weight_s, WEIGHT_LENGTH);
-    // Archive access is newest-first; append in the same order.
-    snprintf(line, sizeof(line), "%s  %s %s",
-             date_s, weight_s,
+    double_str(to_current_unit(get_history_weight(i)), weight_str, sizeof(weight_str));
+    snprintf(value_str, sizeof(value_str), "%s %s", weight_str,
              get_current_unit_index() == 0 ? "kg" : get_short_unit_name());
-
-    size_t used = strlen(details);
-    size_t needed = strlen(line) + (first ? 0 : 1);
-    if (used + needed >= sizeof(details)) break;
-    if (!first) strcat(details, "\n");
-    strcat(details, line);
-    first = false;
-  }
-
-  if (first) {
-    snprintf(details, sizeof(details), "* No data");
+    // Fixed columns keep a clearly visible gap between date and weight.
+    GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+    graphics_draw_text(ctx, date_str_buf, font, GRect(4, y + ROW_TEXT_Y, 91, 23),
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+    graphics_draw_text(ctx, value_str, font,
+                       GRect(101, y + ROW_TEXT_Y, bounds.size.w - 103, 23),
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
   }
 }
-
 
 static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
@@ -79,7 +72,6 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
                        5, GCornersLeft);
     const int mid_x = right - 21;
     if (i == 1) {
-      // Add measurement: black plus sign.
       graphics_draw_line(ctx, GPoint(mid_x - 6, centers[i]),
                          GPoint(mid_x + 6, centers[i]));
       graphics_draw_line(ctx, GPoint(mid_x, centers[i] - 6),
@@ -97,117 +89,89 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
   show_input();
 }
 
-static void details_scroll(ClickRecognizerRef recognizer, void *context) {
-  if (!s_scrolllayer) return;
+static void details_move(ClickRecognizerRef recognizer, void *context) {
+  int count = get_history_count();
+  if (count < 1) return;
+  int step = click_recognizer_get_button_id(recognizer) == BUTTON_ID_UP ? -1 : 1;
+  int target = s_selected + step;
+  if (target < 0 || target >= count) return;
+  s_selected = target;
+  layer_mark_dirty(s_list_layer);
+
   GPoint offset = scroll_layer_get_content_offset(s_scrolllayer);
-  ButtonId button = click_recognizer_get_button_id(recognizer);
-  offset.y += button == BUTTON_ID_UP ? 26 : -26;
-  scroll_layer_set_content_offset(s_scrolllayer, offset, true);
+  GRect frame = layer_get_frame(scroll_layer_get_layer(s_scrolllayer));
+  int visible_top = -offset.y;
+  int visible_bottom = visible_top + frame.size.h;
+  int row_top = s_selected * ROW_HEIGHT;
+  int row_bottom = row_top + ROW_HEIGHT;
+  if (row_top < visible_top) {
+    scroll_layer_set_content_offset(s_scrolllayer, GPoint(0, -row_top), true);
+  } else if (row_bottom > visible_bottom) {
+    scroll_layer_set_content_offset(s_scrolllayer,
+                                    GPoint(0, -(row_bottom - frame.size.h)), true);
+  }
 }
 
 static void details_click_config(void *context) {
-  // Do NOT call scroll_layer_set_click_config_onto_window() here:
-  // it changes the window's click provider while that provider is executing.
-  window_single_repeating_click_subscribe(BUTTON_ID_UP, 150, details_scroll);
+  window_single_repeating_click_subscribe(BUTTON_ID_UP, 150, details_move);
   window_single_click_subscribe(BUTTON_ID_SELECT, select_click_handler);
-  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 150, details_scroll);
+  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 150, details_move);
 }
 
 static void refresh_details(void) {
-  prepare_content();
-  if (!s_textlayer_1 || !s_scrolllayer) return;
-  // Reserve space for the entire history, including same-day entries.
-  // Avoid re-measuring a text layer that may already have been clipped.
-  int lines = get_history_count();
-  if (lines < 1) lines = 1;
-  int height = lines * 28 + TEXT_PADDING + VERT_SCROLL_TEXT_PADDING;
-  if (height > MAX_TEXT_LAYER_SIZE) height = MAX_TEXT_LAYER_SIZE;
-  GRect frame = layer_get_frame(text_layer_get_layer(s_textlayer_1));
-  text_layer_set_size(s_textlayer_1, GSize(frame.size.w, height));
-  text_layer_set_text(s_textlayer_1, details);
+  if (!s_scrolllayer || !s_list_layer) return;
+  int count = get_history_count();
+  if (count < 1) s_selected = 0;
+  else if (s_selected >= count) s_selected = count - 1;
+  int height = (count > 0 ? count : 1) * ROW_HEIGHT;
+  if (height > MAX_LIST_HEIGHT) height = MAX_LIST_HEIGHT;
+  GRect frame = layer_get_frame(s_list_layer);
+  layer_set_frame(s_list_layer, GRect(0, 0, frame.size.w, height));
   scroll_layer_set_content_size(s_scrolllayer, GSize(frame.size.w, height));
   scroll_layer_set_content_offset(s_scrolllayer, GPoint(0, 0), false);
+  s_selected = 0; // Always start on the newest measurement.
+  layer_mark_dirty(s_list_layer);
 }
 
-// Setup the scroll layer on window load
-// We do this here in order to be able to get the max used text size
-static void initialise_ui() {
+static void initialise_ui(void) {
   s_window = window_create();
   window_set_background_color(s_window, BACKGROUND);
-  Layer *window_layer = window_get_root_layer(s_window);
-  GRect bounds = layer_get_frame(window_layer);
-  GRect max_text_bounds = GRect(0, 0, bounds.size.w - 36, MAX_TEXT_LAYER_SIZE);
-
-  /*
-  // s_textlayer_2
-  s_textlayer_2 = text_layer_create(GRect(0, 0, 144, 28));
-  text_layer_set_background_color(s_textlayer_2, GColorClear);
-  text_layer_set_text_color(s_textlayer_2, FOREGROUND);
-  text_layer_set_text(s_textlayer_2, "Details");
-  text_layer_set_text_alignment(s_textlayer_2, GTextAlignmentCenter);
-  text_layer_set_font(s_textlayer_2, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
-  layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_2);
-  */
-
-  // Initialize the scroll layer
-#ifdef PBL_ROUND
-  s_scrolllayer = scroll_layer_create(GRect(0, SCROLL_LAYER_MARGIN, bounds.size.w, bounds.size.h - 2 * SCROLL_LAYER_MARGIN));
-#else
-  s_scrolllayer = scroll_layer_create(GRect(0, 0, bounds.size.w - 36, bounds.size.h));
-#endif
-
-  // UP/DOWN scroll the list; SELECT is configured separately to add a reading.
-
-  // Initialize the text layer
-  s_textlayer_1 = text_layer_create(max_text_bounds);
-  text_layer_set_background_color(s_textlayer_1, GColorClear);
-  text_layer_set_text_color(s_textlayer_1, FOREGROUND);
-  text_layer_set_text(s_textlayer_1, details);
-#ifdef PBL_ROUND
-  text_layer_set_text_alignment(s_textlayer_1, GTextAlignmentCenter);
-#else
-  text_layer_set_text_alignment(s_textlayer_1, GTextAlignmentLeft);
-#endif
-  text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-
-  scroll_layer_add_child(s_scrolllayer, text_layer_get_layer(s_textlayer_1));
-
-  //layer_add_child(window_layer, text_layer_get_layer(s_textlayer_2));
-  layer_add_child(window_layer, scroll_layer_get_layer(s_scrolllayer));
-  s_button_marker = layer_create(GRect(bounds.size.w - 36, 0, 36, bounds.size.h));
+  Layer *root = window_get_root_layer(s_window);
+  GRect bounds = layer_get_bounds(root);
+  int list_width = bounds.size.w - RAIL_WIDTH;
+  s_scrolllayer = scroll_layer_create(GRect(0, 0, list_width, bounds.size.h));
+  s_list_layer = layer_create(GRect(0, 0, list_width, ROW_HEIGHT));
+  layer_set_update_proc(s_list_layer, list_draw);
+  scroll_layer_add_child(s_scrolllayer, s_list_layer);
+  layer_add_child(root, scroll_layer_get_layer(s_scrolllayer));
+  s_button_marker = layer_create(GRect(list_width, 0, RAIL_WIDTH, bounds.size.h));
   layer_set_update_proc(s_button_marker, button_marker_update);
-  layer_add_child(window_layer, s_button_marker);
-
+  layer_add_child(root, s_button_marker);
   refresh_details();
 }
 
-static void destroy_ui() {
+static void handle_window_appear(Window *window) {
+  refresh_details(); // Picks up a newly entered weight on return.
+}
+
+static void handle_window_unload(Window *window) {
   window_destroy(s_window);
-  text_layer_destroy(s_textlayer_1);
-  //text_layer_destroy(s_textlayer_2);
+  layer_destroy(s_list_layer);
   scroll_layer_destroy(s_scrolllayer);
   layer_destroy(s_button_marker);
-}
-
-static void handle_window_appear(Window* window) {
-  refresh_details();
-}
-
-static void handle_window_unload(Window* window) {
-  destroy_ui();
+  s_window = NULL;
+  s_scrolllayer = NULL;
+  s_list_layer = NULL;
+  s_button_marker = NULL;
 }
 
 void show_details(void) {
-  prepare_content();
-
   initialise_ui();
-
   window_set_click_config_provider(s_window, details_click_config);
   window_set_window_handlers(s_window, (WindowHandlers) {
     .unload = handle_window_unload,
-    .appear = handle_window_appear,
+    .appear = handle_window_appear
   });
-
   window_stack_push(s_window, true);
 }
 
