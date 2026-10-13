@@ -1,0 +1,112 @@
+[
+  {
+    "type": "heading",
+    "defaultValue": "WeightTracker"
+  },
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Units and BMI"
+      },
+      {
+        "type": "select",
+        "messageKey": "UNIT",
+        "label": "Weight unit",
+        "defaultValue": "0",
+        "options": [
+          {
+            "label": "Kilograms (kg)",
+            "value": "0"
+          },
+          {
+            "label": "Pounds (lb)",
+            "value": "2"
+          },
+          {
+            "label": "Stone (st)",
+            "value": "1"
+          }
+        ]
+      },
+      {
+        "type": "slider",
+        "messageKey": "HEIGHT_CM",
+        "label": "Height (cm)",
+        "description": "Set to 0 to disable BMI zones. BMI is a screening indicator, not a diagnosis.",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 230,
+        "step": 1
+      }
+    ]
+  },
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Chart"
+      },
+      {
+        "type": "select",
+        "messageKey": "CHART_MODE",
+        "label": "Horizontal axis",
+        "defaultValue": "0",
+        "options": [
+          {
+            "label": "Measurements",
+            "value": "0"
+          },
+          {
+            "label": "Calendar days",
+            "value": "1"
+          }
+        ]
+      },
+      {
+        "type": "slider",
+        "messageKey": "CHART_RANGE",
+        "label": "Number of measurements or days",
+        "defaultValue": 10,
+        "min": 2,
+        "max": 30,
+        "step": 1
+      },
+      {
+        "type": "select",
+        "messageKey": "CHART_COLOR",
+        "label": "Chart color",
+        "description": "BMI bands: green for normal, yellow for under/overweight, red for obesity. Enter height first.",
+        "defaultValue": "0",
+        "options": [
+          {
+            "label": "BMI bands (automatic)",
+            "value": "0"
+          },
+          {
+            "label": "Solid red",
+            "value": "1"
+          },
+          {
+            "label": "Solid green",
+            "value": "2"
+          },
+          {
+            "label": "Solid blue",
+            "value": "3"
+          },
+          {
+            "label": "Solid yellow",
+            "value": "4"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "submit",
+    "defaultValue": "Save"
+  }
+]
