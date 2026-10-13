@@ -27,4 +27,5 @@ double get_accuracy_multiplier(void);
 double get_accuracy_step(void);
 char* get_date_format_str(void);
 void next_unit_index();
+void set_current_unit_index(int cui);
 void next_format();
