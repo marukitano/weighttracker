@@ -19,6 +19,7 @@
 #define HIGHLIGHT PBL_IF_COLOR_ELSE(GColorRed, GColorWhite)
 #define HLFOREGROUND PBL_IF_COLOR_ELSE(GColorWhite, GColorBlack)
 #define INACTIVECELL PBL_IF_COLOR_ELSE(GColorDarkGray, GColorDarkGray)
+#define CHARTFILL GColorDarkCandyAppleRed
 #define CHARTCOLOR PBL_IF_COLOR_ELSE(GColorRed, GColorWhite)
 #define INACTIVETEXT PBL_IF_COLOR_ELSE(GColorWhite, GColorBlack)
 #define ACTIVETEXT PBL_IF_COLOR_ELSE(GColorWhite, GColorBlack)
