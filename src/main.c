@@ -200,7 +200,7 @@ static void initialise_ui(void) {
   text_layer_set_text_color(s_textlayer_2, FOREGROUND);
   text_layer_set_text(s_textlayer_2, "");
   text_layer_set_text_alignment(s_textlayer_2, GTextAlignmentCenter);
-  text_layer_set_font(s_textlayer_2, fonts_get_system_font(PBL_IF_ROUND_ELSE(FONT_KEY_GOTHIC_14_BOLD, FONT_KEY_GOTHIC_24_BOLD)));
+  text_layer_set_font(s_textlayer_2, fonts_get_system_font(PBL_IF_ROUND_ELSE(FONT_KEY_GOTHIC_14_BOLD, FONT_KEY_GOTHIC_18_BOLD)));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_2);
 
   // The Time 2 (emery) has a 200x228 display. Give its chart the full
