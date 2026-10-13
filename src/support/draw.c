@@ -26,23 +26,32 @@ void set_chart_pulse_step(uint8_t step) {
 }
 
 // Browse only real, saved measurements in reverse chronological order.
-double get_chart_history_weight(int offset) {
+// Browse the measurements visible in the selected chart mode.
+static int visible_offset(int offset) {
+  if (get_chart_mode() == 0) return offset;
   int seen = 0;
-  for (int index = get_num_of_days() - 1; index >= 0; --index) {
-    if (!get_measured(index)) continue;
-    if (seen == offset) return get_weight(index);
-    ++seen;
+  uint32_t today = get_current_date();
+  for (int i = 0; i < get_history_count(); ++i) {
+    uint32_t date = get_history_date(i);
+    long age = days(date, today);
+    if (age < 0 || age >= get_chart_range()) continue;
+    if (seen++ == offset) return i;
   }
-  return -1.0;
+  return -1;
 }
-
+double get_chart_history_weight(int offset) {
+  int i = visible_offset(offset);
+  return i < 0 ? -1 : get_history_weight(i);
+}
 int get_chart_history_count(void) {
+  if (get_chart_mode() == 0) return get_history_count();
   int count = 0;
-  for (int i = 0; i < get_num_of_days(); ++i)
-    if (get_measured(i)) ++count;
+  for (int i = 0; i < get_history_count(); ++i) {
+    long age = days(get_history_date(i), get_current_date());
+    if (age >= 0 && age < get_chart_range()) ++count;
+  }
   return count;
 }
-
 double get_chart_display_weight(void) {
   return get_latest_weight();
 }
@@ -122,97 +131,94 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
 
 void draw_chart_callback(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  const int num_days = get_chart_days();
-  const int total_days = get_num_of_days();
-  const int first_day = total_days - num_days;
   const int left = CHART_LEFT;
-  const int right = bounds.size.w - 1 - CHART_RIGHT;
+  const int width = bounds.size.w - 1 - CHART_RIGHT - left;
   const int top = CHART_TOP;
-  const int baseline = bounds.size.h - CHART_BOTTOM;
+  const int height = bounds.size.h - CHART_BOTTOM - top;
   const int fill_bottom = bounds.size.h - 1;
-  // Fixed plot height: always map the recorded weight range into this space.
-  const int height = baseline - top;
-  const int width = right - left;
+  const int range = get_chart_range();
+  const bool by_days = get_chart_mode() == 1;
+  if (width < 1 || height < 1) return;
 
-  if (num_days <= 0 || height <= 0 || width <= 0) return;
-
+  GPoint points[32];
+  bool measured[32] = {false};
+  int count = 0;
+  int selected = 0;
+  double values[32];
+  double min_weight = 0, max_weight = 0;
   bool found = false;
-  double min_weight = 0;
-  double max_weight = 0;
-  for (int i = 0; i < num_days; ++i) {
-    if (!get_measured(first_day + i)) continue;
-    double value = to_current_unit(get_weight(first_day + i));
-    if (!found) {
-      min_weight = max_weight = value;
-      found = true;
-    } else {
-      if (value < min_weight) min_weight = value;
-      if (value > max_weight) max_weight = value;
+
+  if (!by_days) {
+    // Evenly spaced measurements, independent of gaps in calendar time.
+    int available = get_history_count();
+    int take = available < range ? available : range;
+    if (take < 1) return;
+    // When there are fewer than 2 readings, extend the flat curve edge to edge.
+    count = take < 2 ? 2 : take;
+    for (int i = 0; i < count; ++i) {
+      int newest_offset = take == 1 ? 0 : take - 1 - i;
+      values[i] = to_current_unit(get_history_weight(newest_offset));
+      measured[i] = true;
+      if (!found) { min_weight = max_weight = values[i]; found = true; }
+      else {
+        if (values[i] < min_weight) min_weight = values[i];
+        if (values[i] > max_weight) max_weight = values[i];
+      }
+    }
+    selected = take == 1 ? count - 1 : take - 1 - s_selected_history_offset;
+    if (selected < 0) selected = 0;
+    if (selected >= count) selected = count - 1;
+  } else {
+    // Calendar mode preserves true horizontal date spacing.
+    count = range;
+    uint32_t today = get_current_date();
+    int first_known = -1;
+    for (int i = 0; i < count; ++i) {
+      int age = count - 1 - i;
+      for (int j = 0; j < get_history_count(); ++j) {
+        if (days(get_history_date(j), today) != age) continue;
+        values[i] = to_current_unit(get_history_weight(j));
+        measured[i] = true;
+        if (first_known < 0) first_known = i;
+        if (!found) { min_weight = max_weight = values[i]; found = true; }
+        else {
+          if (values[i] < min_weight) min_weight = values[i];
+          if (values[i] > max_weight) max_weight = values[i];
+        }
+        break;
+      }
+    }
+    if (first_known < 0) return;
+    for (int i = 0; i < first_known; ++i) values[i] = values[first_known];
+    for (int i = first_known + 1; i < count; ++i)
+      if (!measured[i]) values[i] = values[i - 1];
+    selected = first_known;
+    int seen = 0;
+    for (int i = count - 1; i >= 0; --i) {
+      if (!measured[i]) continue;
+      if (seen++ == s_selected_history_offset) { selected = i; break; }
     }
   }
-  if (!found) return; // No fake preview when history is empty.
 
-  // Padding keeps flat or near-flat weight histories legible.
   double spread = max_weight - min_weight;
   double pad = spread > 0 ? spread * 0.2 : 1.0;
   min_weight -= pad;
   max_weight += pad;
-
-  // One point per calendar day. Carry the nearest earlier measurement
-  // forward through empty days; extend the first known value left to the edge.
-  // This produces a full-width flat line when only one weight exists.
-  GPoint points[32];
-  int count = 0;
-  double day_values[32];
-  bool known[32];
-  for (int i = 0; i < num_days; ++i) {
-    known[i] = get_measured(first_day + i);
-    day_values[i] = known[i] ? to_current_unit(get_weight(first_day + i)) : 0;
-  }
-  {
-    int first_known = -1;
-    for (int i = 0; i < num_days; ++i) {
-      if (known[i]) { first_known = i; break; }
-    }
-    if (first_known < 0) return;
-    // Extend the first measurement backwards to the beginning of the chart.
-    for (int i = 0; i < first_known; ++i)
-      day_values[i] = day_values[first_known];
-    // Missing dates inherit the previous measurement.
-    for (int i = first_known + 1; i < num_days; ++i)
-      if (!known[i]) day_values[i] = day_values[i - 1];
-  }
-  for (int i = 0; i < num_days; ++i) {
-    int x = left + (int)((int32_t)width * i / (num_days - 1));
-    points[count++] = GPoint(x, chart_y(day_values[i],
-                                         min_weight, max_weight, top, height));
+  for (int i = 0; i < count; ++i) {
+    int x = left + (int)((int32_t)width * i / (count - 1));
+    points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
   }
 
-  // Highlight the selected actual measurement, not an interpolated day.
-  int selected = count - 1;
-  int seen = 0;
-  for (int i = num_days - 1; i >= 0; --i) {
-    if (!known[i]) continue;
-    if (seen == s_selected_history_offset) {
-      selected = i;
-      break;
-    }
-    ++seen;
-  }
-
-  // Dither FIRST so the continuous curve remains crisp above the fill.
-  for (int i = 1; i < count; ++i) {
+  for (int i = 1; i < count; ++i)
     draw_dithered_segment(ctx, points[i - 1], points[i], fill_bottom, left, width);
-  }
 
   graphics_context_set_stroke_color(ctx, CHARTCOLOR);
   graphics_context_set_stroke_width(ctx, 2);
-  for (int i = 1; i < count; ++i) {
+  for (int i = 1; i < count; ++i)
     graphics_draw_line(ctx, points[i - 1], points[i]);
-  }
 
-  // Center the white dot directly ON the plotted line, with a 2px red ring.
-  const GPoint marker = points[selected];
+  // Selected real measurement: white core with a 2px red ring.
+  GPoint marker = points[selected];
   graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_circle(ctx, marker, 7);
   graphics_context_set_fill_color(ctx, FOREGROUND);
