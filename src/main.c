@@ -263,9 +263,13 @@ static void wakeup_handler(/* WakeupId id, int32_t reason */) {
 }
 
 void display_info(void) {
-  text_layer_set_text(s_textlayer_2,
-                      get_chart_days() == 30 ? "Last 30 days" : "Last 15 days");
+  static char chart_title[40];
+  snprintf(chart_title, sizeof(chart_title), "Last %d %s",
+           get_chart_range(), get_chart_mode() ? "days" : "measurements");
+  text_layer_set_text(s_textlayer_2, chart_title);
   if (!s_slide_running) {
+    if (s_history_offset >= get_chart_history_count()) s_history_offset = 0;
+    set_chart_selected_history_offset(s_history_offset);
     format_history_weight(s_history_offset, s_new_weight_text, sizeof(s_new_weight_text));
     if (s_weight_animation_layer) layer_mark_dirty(s_weight_animation_layer);
   }
