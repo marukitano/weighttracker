@@ -16,6 +16,66 @@ static ScrollLayer *s_scrolllayer;
 static Layer *s_list_layer;
 static Layer *s_button_marker;
 static int s_selected = 0;
+static AppTimer *s_entry_timer;
+static AppTimer *s_press_timer;
+static uint8_t s_entry_step;
+static int8_t s_entry_shift = 30;
+static int8_t s_pressed_button = -1;
+static bool s_pressed_down;
+static uint8_t s_press_width[3] = {5, 5, 5};
+// Swiss Chronograph src/c/touch.c: 42 ms, original overshoot sequence.
+static const int8_t s_bounce_offsets[] = {30, 18, 8, -3, 2, -1, 0};
+
+static void entry_tick(void *context) {
+  s_entry_timer = NULL;
+  if (s_entry_step < sizeof(s_bounce_offsets) - 1) ++s_entry_step;
+  s_entry_shift = s_bounce_offsets[s_entry_step];
+  if (s_button_marker) layer_mark_dirty(s_button_marker);
+  if (s_entry_step < sizeof(s_bounce_offsets) - 1)
+    s_entry_timer = app_timer_register(42, entry_tick, NULL);
+}
+
+static void entry_start(void *context) {
+  s_entry_timer = NULL;
+  s_entry_step = 0;
+  s_entry_shift = 30;
+  s_entry_timer = app_timer_register(42, entry_tick, NULL);
+}
+
+static void details_move(ClickRecognizerRef recognizer, void *context);
+static void select_click_handler(ClickRecognizerRef recognizer, void *context);
+static void press_tick(void *context) {
+  s_press_timer = NULL;
+  if (s_pressed_button < 0) return;
+  int i = s_pressed_button;
+  if (s_pressed_down) {
+    if (s_press_width[i] < 7) ++s_press_width[i];
+  } else if (s_press_width[i] > 5) {
+    --s_press_width[i];
+  } else {
+    s_pressed_button = -1;
+    if (i == 1) select_click_handler(NULL, NULL);
+    else details_move(NULL, (void *)(intptr_t)(i == 0 ? -1 : 1));
+    return;
+  }
+  layer_mark_dirty(s_button_marker);
+  s_press_timer = app_timer_register(55, press_tick, NULL);
+}
+
+static void raw_down(ClickRecognizerRef recognizer, void *context) {
+  if (s_pressed_button >= 0 || s_entry_shift != 0) return;
+  ButtonId id = click_recognizer_get_button_id(recognizer);
+  s_pressed_button = id == BUTTON_ID_UP ? 0 : id == BUTTON_ID_SELECT ? 1 : 2;
+  s_pressed_down = true;
+  s_press_timer = app_timer_register(55, press_tick, NULL);
+}
+static void raw_up(ClickRecognizerRef recognizer, void *context) {
+  if (s_pressed_button < 0) return;
+  s_pressed_down = false;
+  if (s_press_timer) app_timer_cancel(s_press_timer);
+  s_press_timer = app_timer_register(55, press_tick, NULL);
+}
+
 
 static void list_draw(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
@@ -65,10 +125,12 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
+  if (s_entry_shift >= 30) return;
   for (int i = 0; i < 3; ++i) {
-    graphics_fill_rect(ctx, GRect(right - 5, centers[i] - 26, 5, 52),
+    graphics_fill_rect(ctx, GRect(right - s_press_width[i] + s_entry_shift,
+                                 centers[i] - 26, s_press_width[i], 52),
                        5, GCornersLeft);
-    const int mid_x = right - 21;
+    const int mid_x = right - 21 + s_entry_shift;
     if (i == 1) {
       // Diagonal edit pencil, pointing toward the lower left.
       graphics_draw_line(ctx, GPoint(mid_x - 6, centers[i] + 6),
@@ -96,7 +158,7 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
 static void details_move(ClickRecognizerRef recognizer, void *context) {
   int count = get_history_count() + 1;
   if (count < 1) return;
-  int step = click_recognizer_get_button_id(recognizer) == BUTTON_ID_UP ? -1 : 1;
+  int step = (int)(intptr_t)context;
   int target = s_selected + step;
   if (target < 0 || target >= count) return;
   s_selected = target;
@@ -117,9 +179,9 @@ static void details_move(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void details_click_config(void *context) {
-  window_single_repeating_click_subscribe(BUTTON_ID_UP, 150, details_move);
-  window_single_click_subscribe(BUTTON_ID_SELECT, select_click_handler);
-  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 150, details_move);
+  window_raw_click_subscribe(BUTTON_ID_UP, raw_down, raw_up, NULL);
+  window_raw_click_subscribe(BUTTON_ID_SELECT, raw_down, raw_up, NULL);
+  window_raw_click_subscribe(BUTTON_ID_DOWN, raw_down, raw_up, NULL);
 }
 
 static void refresh_details(void) {
@@ -158,9 +220,13 @@ static void initialise_ui(void) {
 
 static void handle_window_appear(Window *window) {
   refresh_details(); // Picks up a newly entered weight on return.
+  if (s_entry_shift >= 30 && !s_entry_timer)
+    s_entry_timer = app_timer_register(500, entry_start, NULL);
 }
 
 static void handle_window_unload(Window *window) {
+  if (s_entry_timer) { app_timer_cancel(s_entry_timer); s_entry_timer = NULL; }
+  if (s_press_timer) { app_timer_cancel(s_press_timer); s_press_timer = NULL; }
   window_destroy(s_window);
   layer_destroy(s_list_layer);
   scroll_layer_destroy(s_scrolllayer);
@@ -172,6 +238,11 @@ static void handle_window_unload(Window *window) {
 }
 
 void show_details(void) {
+  s_entry_shift = 30;
+  s_entry_step = 0;
+  s_pressed_button = -1;
+  s_pressed_down = false;
+  for (int i = 0; i < 3; ++i) s_press_width[i] = 5;
   initialise_ui();
   window_set_click_config_provider(s_window, details_click_config);
   window_set_window_handlers(s_window, (WindowHandlers) {
