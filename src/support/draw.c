@@ -329,6 +329,6 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   }
   graphics_context_set_fill_color(ctx, CHARTCOLOR);
   graphics_fill_circle(ctx, marker, 8);
-  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_circle(ctx, marker, 4);
 }
