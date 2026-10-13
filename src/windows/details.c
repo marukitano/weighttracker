@@ -131,8 +131,11 @@ static void refresh_details(void) {
   GRect frame = layer_get_frame(s_list_layer);
   layer_set_frame(s_list_layer, GRect(0, 0, frame.size.w, height));
   scroll_layer_set_content_size(s_scrolllayer, GSize(frame.size.w, height));
-  scroll_layer_set_content_offset(s_scrolllayer, GPoint(0, 0), false);
-  // Keep the selection when returning from the editor.
+  GRect view = layer_get_frame(scroll_layer_get_layer(s_scrolllayer));
+  int scroll_top = s_selected * ROW_HEIGHT - view.size.h + ROW_HEIGHT;
+  if (scroll_top < 0) scroll_top = 0;
+  scroll_layer_set_content_offset(s_scrolllayer, GPoint(0, -scroll_top), false);
+  // Keep the selection visible when returning from the editor.
   layer_mark_dirty(s_list_layer);
 }
 
