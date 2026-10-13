@@ -136,26 +136,39 @@ static void format_history_weight(int offset, char *out, size_t len) {
   snprintf(out, len, "%s", number);
 }
 
+// Render the mask text with a one-pixel chart-red outline.
+static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
+                                 GRect rect) {
+  graphics_context_set_text_color(ctx, CHARTCOLOR);
+  for (int dy = -1; dy <= 1; ++dy) {
+    for (int dx = -1; dx <= 1; ++dx) {
+      if (dx == 0 && dy == 0) continue;
+      graphics_draw_text(ctx, label, font,
+                         GRect(rect.origin.x + dx, rect.origin.y + dy,
+                               rect.size.w, rect.size.h),
+                         GTextOverflowModeTrailingEllipsis,
+                         GTextAlignmentCenter, NULL);
+    }
+  }
+  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_draw_text(ctx, label, font, rect,
+                     GTextOverflowModeTrailingEllipsis,
+                     GTextAlignmentCenter, NULL);
+}
+
 static void weight_slide_draw(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int height = bounds.size.h;
-  // Cut the number out of the chart fill: paint only black glyph pixels,
-  // without an opaque background rectangle.
-  graphics_context_set_text_color(ctx, GColorBlack);
-  // Roboto Bold Subset 49 excludes the decimal point; Bitham supports it.
   GFont font = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
   if (!s_slide_running) {
-    graphics_draw_text(ctx, s_new_weight_text, font, bounds,
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+    draw_outlined_weight(ctx, s_new_weight_text, font, bounds);
     return;
   }
   int travel = (height * s_slide_frame) / 8;
-  graphics_draw_text(ctx, s_old_weight_text, font,
-                     GRect(0, -s_slide_direction * travel, bounds.size.w, height),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-  graphics_draw_text(ctx, s_new_weight_text, font,
-                     GRect(0, s_slide_direction * (height - travel), bounds.size.w, height),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  draw_outlined_weight(ctx, s_old_weight_text, font,
+                       GRect(0, -s_slide_direction * travel, bounds.size.w, height));
+  draw_outlined_weight(ctx, s_new_weight_text, font,
+                       GRect(0, s_slide_direction * (height - travel), bounds.size.w, height));
 }
 
 static void slide_tick(void *context) {
