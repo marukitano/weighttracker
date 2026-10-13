@@ -224,7 +224,8 @@ void load_data(void) {
   s_chart_mode = persist_exists(CHART_MODE_KEY) ? persist_read_int(CHART_MODE_KEY) : 0;
   if (s_chart_mode != 1) s_chart_mode = 0;
   // Older installations used 15/30 calendar days; new default is 10 measurements.
-  s_chart_range = persist_exists(CHART_RANGE_KEY) ? persist_read_int(CHART_RANGE_KEY) : 10;
+  s_chart_range = persist_exists(CHART_MODE_KEY) && persist_exists(CHART_RANGE_KEY)
+      ? persist_read_int(CHART_RANGE_KEY) : 10;
   if (s_chart_range != 10 && s_chart_range != 15 && s_chart_range != 30) s_chart_range = 10;
   history_load();
 
@@ -297,7 +298,9 @@ void load_data(void) {
     dt = decrease_date(dt);
   }
 
-  // Migrate existing calendar entries to the durable archive.
+  // Migrate the legacy last-measurement slot and calendar entries.
+  if (s_latest_date && s_latest_weight > 0)
+    history_add(s_latest_date, s_latest_weight);
   for (i = 0; i < NUM_OF_DAYS; ++i)
     if (data[i].measured) history_add(data[i].date, data[i].weight);
   if (s_history_count > 0 && s_current_weight < 0) {
