@@ -27,6 +27,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "support/pin.h"
 #include "support/parameters.h"
 #include "support/chart_prefs.h"
+#include "support/chart_prefs.h"
 #include "windows/details.h"
 #include "windows/input.h"
 #include "windows/welcome.h"
@@ -163,9 +164,20 @@ static void format_history_weight(int offset, char *out, size_t len) {
 }
 
 // Render the mask text with a one-pixel chart-red outline.
+static GColor outline_for_offset(int offset) {
+  if (chart_prefs_color_mode() != 0 || chart_prefs_height_cm() < 100)
+    return chart_prefs_line_color();
+  double weight = get_chart_history_weight(offset);
+  if (weight <= 0) return chart_prefs_line_color();
+  double m = chart_prefs_height_cm() / 100.0;
+  double bmi = weight / (m * m);
+  if (bmi < 18.5 || (bmi >= 25.0 && bmi < 30.0)) return GColorYellow;
+  return bmi < 25.0 ? GColorGreen : GColorRed;
+}
+
 static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
-                                 GRect rect) {
-  graphics_context_set_text_color(ctx, CHARTCOLOR);
+                                 GRect rect, GColor color) {
+  graphics_context_set_text_color(ctx, color);
   for (int dy = -2; dy <= 2; ++dy) {
     for (int dx = -2; dx <= 2; ++dx) {
       if (dx == 0 && dy == 0) continue;
@@ -187,14 +199,14 @@ static void weight_slide_draw(Layer *layer, GContext *ctx) {
   const int height = bounds.size.h;
   GFont font = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
   if (!s_slide_running) {
-    draw_outlined_weight(ctx, s_new_weight_text, font, bounds);
+    draw_outlined_weight(ctx, s_new_weight_text, font, bounds, outline_for_offset(s_history_offset));
     return;
   }
   int travel = (height * s_slide_frame) / 8;
   draw_outlined_weight(ctx, s_old_weight_text, font,
-                       GRect(0, -s_slide_direction * travel, bounds.size.w, height));
+                       GRect(0, -s_slide_direction * travel, bounds.size.w, height), outline_for_offset(s_history_offset));
   draw_outlined_weight(ctx, s_new_weight_text, font,
-                       GRect(0, s_slide_direction * (height - travel), bounds.size.w, height));
+                       GRect(0, s_slide_direction * (height - travel), bounds.size.w, height), outline_for_offset(s_incoming_offset));
 }
 
 static void slide_tick(void *context) {
@@ -284,7 +296,7 @@ static void initialise_ui(void) {
 
   // s_textlayer_1
 #ifdef PBL_PLATFORM_EMERY
-  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 72, bounds.size.w, 72));
+  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 63, bounds.size.w, 63));
 #else
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
 #endif
