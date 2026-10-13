@@ -1,4 +1,5 @@
 #include <pebble.h>
+#include <stdlib.h>
 #include "chart_prefs.h"
 #include "data.h"
 #include "parameters.h"
