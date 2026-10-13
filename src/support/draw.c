@@ -18,6 +18,10 @@
 static double s_multiplier = 1.0;
 static uint8_t s_pulse_step = 0;
 static int s_selected_history_offset = 0;
+static bool s_color_scale_ready = false;
+static double s_color_min, s_color_max;
+static int s_color_top, s_color_height;
+
 
 void set_chart_selected_history_offset(int offset) {
   s_selected_history_offset = offset < 0 ? 0 : offset;
@@ -225,6 +229,15 @@ static double weight_at_y(int y, double min, double max, int top, int height) {
   return max - ((double)(y - top) / height) * (max - min);
 }
 
+GColor chart_outline_color_at_y(int screen_y) {
+  if (chart_prefs_color_mode() != 0 || chart_prefs_height_cm() < 100 ||
+      !s_color_scale_ready)
+    return chart_prefs_line_color();
+  double weight = weight_at_y(screen_y, s_color_min, s_color_max,
+                              s_color_top, s_color_height);
+  return band_stroke(bmi_band(weight));
+}
+
 void draw_chart_callback(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int left = CHART_LEFT;
@@ -234,6 +247,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   const int fill_bottom = bounds.size.h - 1;
   const int range = get_chart_range();
   const bool by_days = get_chart_mode() == 1;
+  s_color_scale_ready = false;
   if (width < 1 || height < 1) return;
 
   GPoint points[32];
@@ -300,6 +314,11 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   double pad = spread > 0 ? spread * 0.2 : 1.0;
   min_weight -= pad;
   max_weight += pad;
+  s_color_min = min_weight;
+  s_color_max = max_weight;
+  s_color_top = top;
+  s_color_height = height;
+  s_color_scale_ready = true;
   for (int i = 0; i < count; ++i) {
     int x = left + (int)((int32_t)width * i / (count - 1));
     points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
