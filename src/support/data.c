@@ -9,6 +9,11 @@
 // constants
 #define NUM_OF_DAYS 30
 #define CHART_RANGE_KEY 13
+#define CHART_MODE_KEY 14
+#define HISTORY_COUNT_KEY 19
+#define HISTORY_CHUNK_KEY 20
+#define HISTORY_CHUNK_SIZE 20
+#define HISTORY_CHUNKS 5
 #define LAST_STORED_DATE_KEY 0
 #define UNIT_KEY 1
 #define FORMAT_KEY 2
@@ -25,12 +30,87 @@
 #define WT_CURRENT_VERSION 1.2
 
 // global variables
-static int s_chart_days = 15;
-int get_chart_days(void) { return s_chart_days; }
-void toggle_chart_days(void) {
-  s_chart_days = s_chart_days == 15 ? 30 : 15;
-  persist_write_int(CHART_RANGE_KEY, s_chart_days);
+static int s_chart_range = 10;
+static int s_chart_mode = 0;
+int get_chart_days(void) { return s_chart_range; }
+int get_chart_range(void) { return s_chart_range; }
+int get_chart_mode(void) { return s_chart_mode; }
+void toggle_chart_mode(void) {
+  s_chart_mode = 1 - s_chart_mode;
+  persist_write_int(CHART_MODE_KEY, s_chart_mode);
 }
+void next_chart_range(void) {
+  s_chart_range = s_chart_range == 10 ? 15 : s_chart_range == 15 ? 30 : 10;
+  persist_write_int(CHART_RANGE_KEY, s_chart_range);
+}
+void toggle_chart_days(void) { next_chart_range(); }
+
+// Compact, durable archive of the last 100 distinct measurement dates.
+// Stored in five 160-byte chunks to stay below Pebble's per-key limit.
+typedef struct {
+  uint32_t date;
+  int32_t weight_10000;
+} HistoryEntry;
+static HistoryEntry s_history[HISTORY_CAPACITY]; // oldest first
+static int s_history_count = 0;
+
+int get_history_count(void) { return s_history_count; }
+double get_history_weight(int newest_offset) {
+  int i = s_history_count - 1 - newest_offset;
+  return i >= 0 && i < s_history_count ? (double)s_history[i].weight_10000 / 10000.0 : -1;
+}
+uint32_t get_history_date(int newest_offset) {
+  int i = s_history_count - 1 - newest_offset;
+  return i >= 0 && i < s_history_count ? s_history[i].date : 0;
+}
+static void history_add(uint32_t date, double weight) {
+  if (!date || weight <= 0) return;
+  int32_t value = (int32_t)(weight * 10000.0 + 0.5);
+  int index = 0;
+  while (index < s_history_count && s_history[index].date < date) ++index;
+  if (index < s_history_count && s_history[index].date == date) {
+    s_history[index].weight_10000 = value;
+    return;
+  }
+  if (s_history_count == HISTORY_CAPACITY) {
+    if (index == 0) return; // Older than the oldest retained measurement.
+    for (int j = 1; j < s_history_count; ++j) s_history[j - 1] = s_history[j];
+    --s_history_count;
+    --index;
+  }
+  for (int j = s_history_count; j > index; --j) s_history[j] = s_history[j - 1];
+  s_history[index].date = date;
+  s_history[index].weight_10000 = value;
+  ++s_history_count;
+}
+static void history_load(void) {
+  s_history_count = 0;
+  int count = persist_exists(HISTORY_COUNT_KEY) ? persist_read_int(HISTORY_COUNT_KEY) : 0;
+  if (count < 0 || count > HISTORY_CAPACITY) return;
+  for (int chunk = 0; chunk < HISTORY_CHUNKS && s_history_count < count; ++chunk) {
+    int n = count - s_history_count;
+    if (n > HISTORY_CHUNK_SIZE) n = HISTORY_CHUNK_SIZE;
+    int got = persist_read_data(HISTORY_CHUNK_KEY + chunk,
+                                &s_history[s_history_count], n * sizeof(HistoryEntry));
+    if (got != n * (int)sizeof(HistoryEntry)) break;
+    s_history_count += n;
+  }
+}
+static void history_save(void) {
+  for (int chunk = 0; chunk < HISTORY_CHUNKS; ++chunk) {
+    int start = chunk * HISTORY_CHUNK_SIZE;
+    if (start >= s_history_count) {
+      persist_safe_delete(HISTORY_CHUNK_KEY + chunk);
+      continue;
+    }
+    int n = s_history_count - start;
+    if (n > HISTORY_CHUNK_SIZE) n = HISTORY_CHUNK_SIZE;
+    persist_write_data(HISTORY_CHUNK_KEY + chunk, &s_history[start],
+                       n * sizeof(HistoryEntry));
+  }
+  persist_write_int(HISTORY_COUNT_KEY, s_history_count);
+}
+
 static double s_current_weight;
 static uint32_t s_current_date;
 static uint32_t s_last_stored_date;
@@ -141,8 +221,12 @@ void load_data(void) {
   }
 
   init_settings(unit, format, fday);
-  s_chart_days = persist_exists(CHART_RANGE_KEY) &&
-                 persist_read_int(CHART_RANGE_KEY) == 30 ? 30 : 15;
+  s_chart_mode = persist_exists(CHART_MODE_KEY) ? persist_read_int(CHART_MODE_KEY) : 0;
+  if (s_chart_mode != 1) s_chart_mode = 0;
+  // Older installations used 15/30 calendar days; new default is 10 measurements.
+  s_chart_range = persist_exists(CHART_RANGE_KEY) ? persist_read_int(CHART_RANGE_KEY) : 10;
+  if (s_chart_range != 10 && s_chart_range != 15 && s_chart_range != 30) s_chart_range = 10;
+  history_load();
 
   if (persist_exists(REMINDER_FLAG_KEY)) {
     hr = persist_read_int(REMINDER_FLAG_KEY);
@@ -213,6 +297,13 @@ void load_data(void) {
     dt = decrease_date(dt);
   }
 
+  // Migrate existing calendar entries to the durable archive.
+  for (i = 0; i < NUM_OF_DAYS; ++i)
+    if (data[i].measured) history_add(data[i].date, data[i].weight);
+  if (s_history_count > 0 && s_current_weight < 0) {
+    s_current_weight = get_history_weight(0);
+    s_current_date = get_history_date(0);
+  }
   if (s_current_weight < 0) {
     s_current_weight = (s_latest_weight < 0) ? 80.0 : s_latest_weight;
     s_current_date = (s_latest_weight < 0) ? s_current_date : s_latest_date;
@@ -248,6 +339,7 @@ void save_data(void) {
     persist_safe_delete(LAST_MEASUREMENT_DATE_KEY);
   }
 
+  history_save();
   if (!s_used_already) {
     return;
   }
@@ -315,6 +407,7 @@ void set_current(double weight) {
   }
 
   s_used_already = 1;
+  history_add(dt, weight);
   data[TODAY_INDEX].weight = weight;
   data[TODAY_INDEX].date = dt;
   data[TODAY_INDEX].measured = 1;
