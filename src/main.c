@@ -27,7 +27,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "support/pin.h"
 #include "support/parameters.h"
 #include "support/chart_prefs.h"
-#include "support/chart_prefs.h"
 #include "windows/details.h"
 #include "windows/input.h"
 #include "windows/welcome.h"
@@ -329,6 +328,9 @@ static void initialise_ui(void) {
   layer_set_clips(s_weight_animation_layer, true);
   layer_set_update_proc(s_weight_animation_layer, weight_slide_draw);
   layer_add_child(window_get_root_layer(s_window), s_weight_animation_layer);
+  // Weight now follows the fixed center marker as a vertical chart label.
+  // Keep legacy layer allocated for navigation compatibility, but hide it.
+  layer_set_hidden(s_weight_animation_layer, true);
 
   // Lower right button indicator: center 36px above bottom, as in Swiss Chronograph.
   s_button_marker = layer_create(GRect(bounds.size.w - 36, 0, 36, bounds.size.h));
