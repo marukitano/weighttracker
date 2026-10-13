@@ -203,7 +203,7 @@ static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
     }
     graphics_release_frame_buffer(ctx, framebuffer);
   }
-  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, label, font, rect,
                      GTextOverflowModeTrailingEllipsis,
                      GTextAlignmentCenter, NULL);
@@ -299,7 +299,7 @@ static void change_history(int direction) {
 
 static void initialise_ui(void) {
   s_window = window_create();
-  window_set_background_color(s_window, BACKGROUND);
+  window_set_background_color(s_window, GColorWhite);
   Layer *window_layer = window_get_root_layer(s_window);
   GRect bounds = layer_get_frame(window_layer);
 
@@ -321,7 +321,7 @@ static void initialise_ui(void) {
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
 #endif
   text_layer_set_background_color(s_textlayer_1, GColorClear);
-  text_layer_set_text_color(s_textlayer_1, FOREGROUND);
+  text_layer_set_text_color(s_textlayer_1, GColorBlack);
   text_layer_set_text_alignment(s_textlayer_1, GTextAlignmentCenter);
   text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
   // Clip the old/new animated weights to the caption area.
