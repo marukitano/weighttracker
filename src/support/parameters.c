@@ -4,7 +4,7 @@
 static char date_format_str[4];
 
 static const UnitType units[NUM_OF_UNITS] = {
-  { "kilogram", "kgs", 1.0, 1 },
+  { "kilogram", "kg", 1.0, 1 },
   { "stone", "sts", 6.35029318, 2 },
   { "pound", "lbs", 0.45359237, 1 }
 };
