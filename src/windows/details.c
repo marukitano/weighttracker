@@ -112,11 +112,11 @@ static void list_draw(Layer *layer, GContext *ctx) {
     // Weight first, date second, with room for the right-side icons.
     GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
     graphics_draw_text(ctx, value_str, font,
-                       GRect(30, y + ROW_TEXT_Y, bounds.size.w / 2 - 30, 23),
+                       GRect(40, y + ROW_TEXT_Y, bounds.size.w / 2 - 40, 23),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
     graphics_draw_text(ctx, date_str_buf, font,
                        GRect(bounds.size.w / 2, y + ROW_TEXT_Y,
-                             bounds.size.w / 2 - 30, 23),
+                             bounds.size.w / 2 - 40, 23),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
   }
 }
