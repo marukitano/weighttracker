@@ -10,7 +10,7 @@
 // The fill grows denser from left (older) to right (newer), with no min/max labels.
 #define CHART_LEFT 0
 // Reserve 48px for rotated DD.MM. plus 12px gap above the ring.
-#define CHART_TOP 57
+#define CHART_TOP 52
 #define CHART_RIGHT 0
 #define CHART_BOTTOM 79
 
