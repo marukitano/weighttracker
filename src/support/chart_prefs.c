@@ -24,6 +24,14 @@ GColor chart_prefs_solid_color(void) {
     default: return GColorDarkCandyAppleRed;
   }
 }
+GColor chart_prefs_line_color(void) {
+  switch (s_color_mode) {
+    case 2: return GColorGreen;
+    case 3: return GColorBlue;
+    case 4: return GColorYellow;
+    default: return GColorRed;
+  }
+}
 void chart_prefs_load(void) {
   s_height_cm = persist_exists(KEY_HEIGHT) ? persist_read_int(KEY_HEIGHT) : 0;
   if (s_height_cm < 100 || s_height_cm > 230) s_height_cm = 0;
