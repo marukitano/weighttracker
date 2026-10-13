@@ -46,3 +46,5 @@ int get_chart_mode(void); // 0 = measurements, 1 = calendar days
 void toggle_chart_mode(void);
 void next_chart_range(void);
 int get_chart_range(void);
+void set_chart_mode(int mode);
+void set_chart_range(int count);
