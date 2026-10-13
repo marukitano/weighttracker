@@ -2,7 +2,6 @@
 #include "../support/config.h"
 #include "../support/reminder.h"
 #include "../support/utils.h"
-#include "../windows/settings.h"
 #include "days.h"
 #include "time.h"
 
