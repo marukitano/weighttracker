@@ -121,6 +121,7 @@ static void initialise_ui(void) {
   s_controls_frame = layer_get_frame(action_bar_layer_get_layer(s_actionbarlayer));
   s_controls_offset = 30;
   s_controls_step = 0;
+  s_controls_pressed = false;
   layer_set_frame(action_bar_layer_get_layer(s_actionbarlayer),
                   GRect(s_controls_frame.origin.x + 30, s_controls_frame.origin.y,
                         s_controls_frame.size.w, s_controls_frame.size.h));
