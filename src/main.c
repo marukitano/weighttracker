@@ -108,10 +108,10 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(icon_left, center_y[i] + 4),
                          GPoint(icon_right - 5, center_y[i] + 4));
     } else {
-      // Upper key: right chevron; lower key: left chevron.
+      // Upper key: left chevron; lower key: right chevron.
       const int mid_x = (icon_left + icon_right) / 2;
-      const int tip_x = mid_x + (i == 0 ? 4 : -4);
-      const int arm_x = mid_x + (i == 0 ? -3 : 3);
+      const int tip_x = mid_x + (i == 0 ? -4 : 4);
+      const int arm_x = mid_x + (i == 0 ? 3 : -3);
       graphics_draw_line(ctx, GPoint(arm_x, center_y[i] - 6),
                          GPoint(tip_x, center_y[i]));
       graphics_draw_line(ctx, GPoint(tip_x, center_y[i]),
@@ -293,9 +293,9 @@ static void button_anim_tick(void *context) {
     s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
   } else {
     s_active_button = -1;
-    if (i == 0) change_history(-1);
+    if (i == 0) change_history(1);
     else if (i == 1) show_details();
-    else change_history(1);
+    else change_history(-1);
   }
 }
 
