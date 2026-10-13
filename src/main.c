@@ -88,13 +88,14 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int center_y[3] = {36, bounds.size.h / 2, bounds.size.h - 36};
   const int edge_x = bounds.size.w;
-  // Continuous red side rail behind all three button markers and icons.
-  graphics_context_set_fill_color(ctx, GColorRed);
+  // Continuous black side rail behind all three button markers and icons.
+  graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   // 2px black divider between the chart and the red control rail.
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, GRect(0, 0, 2, bounds.size.h), 0, GCornerNone);
-  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
