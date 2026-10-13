@@ -26,7 +26,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "support/data.h"
 #include "support/pin.h"
 #include "support/parameters.h"
-#include "windows/settings.h"
+#include "support/chart_prefs.h"
 #include "windows/details.h"
 #include "windows/input.h"
 #include "windows/welcome.h"
@@ -473,6 +473,17 @@ static void hide_main(void) {
   window_stack_remove(s_window, true);
 }
 
+static void config_received(DictionaryIterator *iter, void *context) {
+  if (!chart_prefs_apply(iter)) return;
+  s_history_offset = 0;
+  s_incoming_offset = 0;
+  s_slide_running = false;
+  set_chart_selected_history_offset(0);
+  display_info();
+  if (s_chart) layer_mark_dirty(s_chart);
+  if (s_weight_animation_layer) layer_mark_dirty(s_weight_animation_layer);
+}
+
 void init() {
   pin_initialize();
   s_today = get_year_day();
@@ -482,10 +493,14 @@ void init() {
 #endif
 
   load_data();
+  chart_prefs_load();
+  app_message_register_inbox_received(config_received);
+  app_message_open(256, 64);
   wakeup_service_subscribe(wakeup_handler);
 }
 
 static void deinit() {
+  app_message_deregister_callbacks();
   save_data();
   pin_deinitalize();
 }
