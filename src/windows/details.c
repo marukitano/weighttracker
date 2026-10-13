@@ -111,11 +111,13 @@ static void list_draw(Layer *layer, GContext *ctx) {
              get_current_unit_index() == 0 ? "kg" : get_short_unit_name());
     // Weight first, date second, with room for the right-side icons.
     GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
-    graphics_draw_text(ctx, value_str, font, GRect(4, y + ROW_TEXT_Y, 76, 23),
+    graphics_draw_text(ctx, value_str, font,
+                       GRect(15, y + ROW_TEXT_Y, bounds.size.w / 2 - 15, 23),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
     graphics_draw_text(ctx, date_str_buf, font,
-                       GRect(85, y + ROW_TEXT_Y, bounds.size.w - 121, 23),
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+                       GRect(bounds.size.w / 2, y + ROW_TEXT_Y,
+                             bounds.size.w / 2 - 15, 23),
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
   }
 }
 
