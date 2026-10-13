@@ -68,10 +68,9 @@ static void history_add(uint32_t date, double weight) {
   int32_t value = (int32_t)(weight * 10000.0 + 0.5);
   int index = 0;
   while (index < s_history_count && s_history[index].date < date) ++index;
-  if (index < s_history_count && s_history[index].date == date) {
-    s_history[index].weight_10000 = value;
-    return;
-  }
+  // A calendar day can contain multiple measurements.
+  // Keep them all in insertion order instead of overwriting the same date.
+  while (index < s_history_count && s_history[index].date == date) ++index;
   if (s_history_count == HISTORY_CAPACITY) {
     if (index == 0) return; // Older than the oldest retained measurement.
     for (int j = 1; j < s_history_count; ++j) s_history[j - 1] = s_history[j];
@@ -298,11 +297,21 @@ void load_data(void) {
     dt = decrease_date(dt);
   }
 
-  // Migrate the legacy last-measurement slot and calendar entries.
-  if (s_latest_date && s_latest_weight > 0)
-    history_add(s_latest_date, s_latest_weight);
-  for (i = 0; i < NUM_OF_DAYS; ++i)
-    if (data[i].measured) history_add(data[i].date, data[i].weight);
+  // Import old one-per-day records only when that date is not archived yet.
+  // Without this guard, every app launch would duplicate legacy records.
+  if (s_latest_date && s_latest_weight > 0) {
+    bool exists = false;
+    for (i = 0; i < s_history_count; ++i)
+      if (s_history[i].date == s_latest_date) { exists = true; break; }
+    if (!exists) history_add(s_latest_date, s_latest_weight);
+  }
+  for (i = 0; i < NUM_OF_DAYS; ++i) {
+    if (!data[i].measured) continue;
+    bool exists = false;
+    for (int j = 0; j < s_history_count; ++j)
+      if (s_history[j].date == data[i].date) { exists = true; break; }
+    if (!exists) history_add(data[i].date, data[i].weight);
+  }
   if (s_history_count > 0 && s_current_weight < 0) {
     s_current_weight = get_history_weight(0);
     s_current_date = get_history_date(0);
