@@ -7,8 +7,8 @@
 #include "../windows/input.h"
 
 #define RAIL_WIDTH 36
-#define ROW_HEIGHT 30
-#define ROW_TEXT_Y 5
+#define ROW_HEIGHT 38
+#define ROW_TEXT_Y 7
 #define MAX_LIST_HEIGHT ((HISTORY_CAPACITY + 1) * ROW_HEIGHT)
 
 static Window *s_window;
@@ -90,7 +90,7 @@ static void list_draw(Layer *layer, GContext *ctx) {
       graphics_fill_rect(ctx, GRect(0, y, bounds.size.w, ROW_HEIGHT),
                          0, GCornerNone);
     }
-    graphics_context_set_text_color(ctx, active ? GColorBlack : GColorWhite);
+    graphics_context_set_text_color(ctx, GColorBlack);
     if (i == 0) {
       graphics_draw_text(ctx, "+", fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD),
                          GRect(0, y - 3, bounds.size.w, ROW_HEIGHT + 6),
@@ -102,21 +102,20 @@ static void list_draw(Layer *layer, GContext *ctx) {
     char date_str_buf[16];
     char weight_str[16];
     char value_str[24];
-    snprintf(date_str_buf, sizeof(date_str_buf), "%02lu.%02lu.%04lu",
+    snprintf(date_str_buf, sizeof(date_str_buf), "%02lu.%02lu.",
              (unsigned long)(date % 100),
-             (unsigned long)((date / 100) % 100),
-             (unsigned long)(date / 10000));
+             (unsigned long)((date / 100) % 100));
     double_str(to_current_unit(get_history_weight(history_offset)), weight_str, sizeof(weight_str));
     snprintf(value_str, sizeof(value_str), "%s %s", weight_str,
              get_current_unit_index() == 0 ? "kg" : get_short_unit_name());
     // Weight first, date second, with room for the right-side icons.
-    GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+    GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
     graphics_draw_text(ctx, value_str, font,
-                       GRect(40, y + ROW_TEXT_Y, bounds.size.w / 2 - 40, 23),
+                       GRect(40, y + ROW_TEXT_Y, bounds.size.w / 2 - 40, 29),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
     graphics_draw_text(ctx, date_str_buf, font,
                        GRect(bounds.size.w / 2, y + ROW_TEXT_Y,
-                             bounds.size.w / 2 - 40, 23),
+                             bounds.size.w / 2 - 40, 29),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
   }
 }
@@ -223,7 +222,7 @@ static void refresh_details(void) {
 
 static void initialise_ui(void) {
   s_window = window_create();
-  window_set_background_color(s_window, BACKGROUND);
+  window_set_background_color(s_window, GColorWhite);
   Layer *root = window_get_root_layer(s_window);
   GRect bounds = layer_get_bounds(root);
   int list_width = bounds.size.w;
