@@ -112,14 +112,14 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(icon_left, center_y[i] + 4),
                          GPoint(icon_right - 5, center_y[i] + 4));
     } else {
-      // Upper key: up chevron; lower key: down chevron.
+      // Upper key: right chevron; lower key: left chevron.
       const int mid_x = (icon_left + icon_right) / 2;
-      const int tip_y = center_y[i] + (i == 0 ? -4 : 4);
-      const int arm_y = center_y[i] + (i == 0 ? 3 : -3);
-      graphics_draw_line(ctx, GPoint(mid_x - 6, arm_y),
-                         GPoint(mid_x, tip_y));
-      graphics_draw_line(ctx, GPoint(mid_x, tip_y),
-                         GPoint(mid_x + 6, arm_y));
+      const int tip_x = mid_x + (i == 0 ? 4 : -4);
+      const int arm_x = mid_x + (i == 0 ? -3 : 3);
+      graphics_draw_line(ctx, GPoint(arm_x, center_y[i] - 6),
+                         GPoint(tip_x, center_y[i]));
+      graphics_draw_line(ctx, GPoint(tip_x, center_y[i]),
+                         GPoint(arm_x, center_y[i] + 6));
     }
   }
 }
@@ -140,8 +140,8 @@ static void format_history_weight(int offset, char *out, size_t len) {
 static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
                                  GRect rect) {
   graphics_context_set_text_color(ctx, CHARTCOLOR);
-  for (int dy = -1; dy <= 1; ++dy) {
-    for (int dx = -1; dx <= 1; ++dx) {
+  for (int dy = -2; dy <= 2; ++dy) {
+    for (int dx = -2; dx <= 2; ++dx) {
       if (dx == 0 && dy == 0) continue;
       graphics_draw_text(ctx, label, font,
                          GRect(rect.origin.x + dx, rect.origin.y + dy,
