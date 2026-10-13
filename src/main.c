@@ -41,6 +41,15 @@ static Layer *s_chart;
 static Layer *s_button_marker;
 static AppTimer *s_button_anim_timer;
 static uint8_t s_button_width[3] = {5, 5, 5};
+// 36px offscreen -> small overshoot -> settle, with staggered entrance.
+static int8_t s_button_enter_x[3] = {36, 36, 36};
+static uint8_t s_button_enter_frame[3] = {0, 0, 0};
+static bool s_button_entering[3] = {false, false, false};
+static AppTimer *s_button_enter_timer;
+static AppTimer *s_button_intro_timer;
+static bool s_buttons_introduced = false;
+static const int8_t BUTTON_BOUNCE_X[] = {36, 29, 19, 8, -4, -1, 2, 0};
+
 static int8_t s_active_button = -1;
 static bool s_button_held = false;
 static AppTimer *s_pulse_timer;
@@ -94,12 +103,14 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
+    if (s_button_enter_x[i] >= 36) continue;
+    int shift = s_button_enter_x[i];
     int marker_width = s_button_width[i];
     graphics_fill_rect(ctx,
-                       GRect(edge_x - marker_width, center_y[i] - 26,
+                       GRect(edge_x - marker_width + shift, center_y[i] - 26,
                              marker_width, 52),
                        5, GCornersLeft);
-    const int icon_right = edge_x - 14;
+    const int icon_right = edge_x - 14 + shift;
     const int icon_left = icon_right - 13;
     if (i == 1) {
       // Two-line list icon: longer upper stroke, shorter lower stroke.
@@ -181,6 +192,34 @@ static void slide_tick(void *context) {
   }
 }
 
+static void button_enter_tick(void *context) {
+  s_button_enter_timer = NULL;
+  bool more = false;
+  for (int i = 0; i < 3; ++i) {
+    if (!s_button_entering[i]) continue;
+    uint8_t frame = s_button_enter_frame[i];
+    if (frame < sizeof(BUTTON_BOUNCE_X) / sizeof(BUTTON_BOUNCE_X[0]) - 1)
+      ++s_button_enter_frame[i];
+    s_button_enter_x[i] = BUTTON_BOUNCE_X[s_button_enter_frame[i]];
+    if (s_button_enter_frame[i] >= sizeof(BUTTON_BOUNCE_X) / sizeof(BUTTON_BOUNCE_X[0]) - 1)
+      s_button_entering[i] = false;
+    else more = true;
+  }
+  if (s_button_marker) layer_mark_dirty(s_button_marker);
+  if (more) s_button_enter_timer = app_timer_register(40, button_enter_tick, NULL);
+}
+
+static void button_intro_tick(void *context) {
+  s_button_intro_timer = NULL;
+  s_buttons_introduced = true;
+  for (int i = 0; i < 2; ++i) {
+    s_button_entering[i] = true;
+    s_button_enter_frame[i] = 0;
+  }
+  if (!s_button_enter_timer)
+    s_button_enter_timer = app_timer_register(40, button_enter_tick, NULL);
+}
+
 static void change_history(int direction) {
   if (s_slide_running) return;
   int target = s_history_offset + direction;
@@ -191,6 +230,16 @@ static void change_history(int direction) {
   if (s_chart) layer_mark_dirty(s_chart);
   s_slide_direction = direction;
   format_history_weight(target, s_new_weight_text, sizeof(s_new_weight_text));
+  if (target > 0 && s_button_enter_x[2] >= 36 && !s_button_entering[2]) {
+    s_button_entering[2] = true;
+    s_button_enter_frame[2] = 0;
+    if (!s_button_enter_timer)
+      s_button_enter_timer = app_timer_register(40, button_enter_tick, NULL);
+  } else if (target == 0) {
+    s_button_entering[2] = false;
+    s_button_enter_x[2] = 36;
+    if (s_button_marker) layer_mark_dirty(s_button_marker);
+  }
   s_slide_running = true;
   s_slide_frame = 0;
   s_weight_animation_timer = app_timer_register(35, slide_tick, NULL);
@@ -242,6 +291,14 @@ static void initialise_ui(void) {
 static void destroy_ui(void) {
   window_destroy(s_window);
   layer_destroy(s_chart);
+  if (s_button_enter_timer) {
+    app_timer_cancel(s_button_enter_timer);
+    s_button_enter_timer = NULL;
+  }
+  if (s_button_intro_timer) {
+    app_timer_cancel(s_button_intro_timer);
+    s_button_intro_timer = NULL;
+  }
   if (s_button_anim_timer) {
     app_timer_cancel(s_button_anim_timer);
     s_button_anim_timer = NULL;
@@ -303,6 +360,7 @@ static void button_raw_down(ClickRecognizerRef recognizer, void *context) {
   if (s_active_button >= 0) return;
   ButtonId id = click_recognizer_get_button_id(recognizer);
   int i = id == BUTTON_ID_UP ? 0 : id == BUTTON_ID_SELECT ? 1 : 2;
+  if (s_button_enter_x[i] != 0 || s_button_entering[i]) return;
   s_active_button = i;
   s_button_held = true;
   if (s_button_anim_timer) app_timer_cancel(s_button_anim_timer);
@@ -348,10 +406,18 @@ static void handle_window_appear(Window* window) {
   if (!s_pulse_timer) s_pulse_timer = app_timer_register(PULSE_FRAME_MS, pulse_timer_callback, NULL);
   display_info();
   if (s_chart) layer_mark_dirty(s_chart);
+  if (!s_buttons_introduced && !s_button_intro_timer)
+    s_button_intro_timer = app_timer_register(330, button_intro_tick, NULL);
 }
 
 static void show_main(void) {
-  for (int i = 0; i < 3; ++i) s_button_width[i] = 5;
+  for (int i = 0; i < 3; ++i) {
+    s_button_width[i] = 5;
+    s_button_enter_x[i] = 36;
+    s_button_enter_frame[i] = 0;
+    s_button_entering[i] = false;
+  }
+  s_buttons_introduced = false;
   s_active_button = -1;
   s_button_held = false;
   s_history_offset = 0;
