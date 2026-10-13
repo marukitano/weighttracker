@@ -171,38 +171,37 @@ static void draw_dithered_segment(GContext *ctx, GPoint start, GPoint end,
   }
 }
 
-// Tiny pixel characters for vertically oriented date and weight labels.
-static const uint8_t DATE_GLYPHS[11][5] = {
-  {7,5,5,5,7}, {2,6,2,2,7}, {7,1,7,4,7}, {7,1,7,1,7},
-  {5,5,7,1,1}, {7,4,7,1,7}, {7,4,7,5,7}, {7,1,1,1,1},
-  {7,5,7,5,7}, {7,5,7,1,7}, {0,0,0,2,2}
-};
+// Standard Pebble fonts keep labels upright and legible.
+static void draw_measurement_labels(GContext *ctx, GPoint marker,
+                                    uint32_t date, double weight) {
+  static const char *MONTHS[] = {
+    "Jan.", "Feb.", "Maerz", "Apr.", "Mai", "Juni",
+    "Juli", "Aug.", "Sep.", "Okt.", "Nov.", "Dez."
+  };
+  int day = date % 100;
+  int month = (date / 100) % 100;
+  char date_text[24];
+  if (month >= 1 && month <= 12)
+    snprintf(date_text, sizeof(date_text), "%d. %s", day, MONTHS[month - 1]);
+  else
+    snprintf(date_text, sizeof(date_text), "%02d.%02d.", day, month);
 
-// Vertical text: date reads in the opposite orientation to the earlier
-// version (180-degree rotation); weight is placed underneath the marker.
-static void draw_vertical_label(GContext *ctx, const char *label,
-                                GPoint marker, bool above) {
-  const int pixel = 2;
-  int n = 0;
-  while (label[n] && n < 12) ++n;
-  if (!n) return;
-  int x0 = marker.x - 5;
-  int origin_y = above ? marker.y - 16 - 8 * n : marker.y + 16;
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  for (int c = 0; c < n; ++c) {
-    int glyph = label[c] == '.' ? 10 : label[c] - '0';
-    if (glyph < 0 || glyph > 10) continue;
-    for (int row = 0; row < 5; ++row) {
-      for (int col = 0; col < 3; ++col) {
-        if (!(DATE_GLYPHS[glyph][row] & (1 << (2 - col)))) continue;
-        // Rotate each complete horizontal glyph by 90 degrees, and arrange
-        // characters upward (date) or downward (weight).
-        int x = x0 + (above ? 4 - row : row) * pixel;
-        int y = origin_y + c * 8 + (above ? 2 - col : col) * pixel;
-        graphics_fill_rect(ctx, GRect(x, y, pixel, pixel), 0, GCornerNone);
-      }
-    }
-  }
+  char number[16], weight_text[28];
+  double_str(to_current_unit(weight), number, sizeof(number) - 1);
+  snprintf(weight_text, sizeof(weight_text), "%s %s", number,
+           get_short_unit_name());
+
+  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_draw_text(ctx, date_text,
+                     fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+                     GRect(marker.x - 85, marker.y - 47, 170, 32),
+                     GTextOverflowModeTrailingEllipsis,
+                     GTextAlignmentCenter, NULL);
+  graphics_draw_text(ctx, weight_text,
+                     fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK),
+                     GRect(marker.x - 94, marker.y + 14, 188, 47),
+                     GTextOverflowModeTrailingEllipsis,
+                     GTextAlignmentCenter, NULL);
 }
 
 // The color regions are defined by weight thresholds, not by individual
@@ -352,16 +351,8 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   marker.x = bounds.size.w / 2;
   int history_offset = visible_offset(s_selected_history_offset);
   if (history_offset >= 0 && history_offset < get_history_count()) {
-    uint32_t date = get_history_date(history_offset);
-    char date_label[8];
-    snprintf(date_label, sizeof(date_label), "%02lu.%02lu.",
-             (unsigned long)(date % 100),
-             (unsigned long)((date / 100) % 100));
-    draw_vertical_label(ctx, date_label, marker, true);
-    char weight_label[16];
-    double_str(to_current_unit(get_history_weight(history_offset)),
-               weight_label, sizeof(weight_label) - 1);
-    draw_vertical_label(ctx, weight_label, marker, false);
+    draw_measurement_labels(ctx, marker, get_history_date(history_offset),
+                            get_history_weight(history_offset));
   }
   graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_circle(ctx, marker, 8);
