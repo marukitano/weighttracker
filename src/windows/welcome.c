@@ -15,11 +15,11 @@ static const char s_details[] =
 "What's new in version 1.2: showing the first day of the weeks on the graph to enable quicker grasp of it\n"
 "\n"
 "Short instructions to use the app:\n"
-"- UP button (on the main page) - brings you to the settings\n"
-"- SELECT button - brings you to the input page to record your weight\n"
-"- DOWN button - gives you a list of the stored measurements\n"
+"- UP button on the chart - browse older measurements\n"
+"- SELECT button - opens the measurement list\n"
+"- DOWN button - browse newer measurements\n"
 "\n"
-"Push the BACK button to close this page (you can always reopen it with About page menu item on the Settings page)";
+"Configure units, height, chart mode, range and colors on your phone. Press BACK to close this page.";
 
 static Window *s_window;
 static ScrollLayer *s_scrolllayer;
