@@ -249,6 +249,8 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_fill_color(ctx, GColorDarkGray);
+  graphics_context_set_stroke_color(ctx, GColorDarkGray);
+  graphics_context_set_stroke_width(ctx, 1);
   for (int i = 1; i < count; ++i) {
     GPoint a = points[i - 1], b = points[i];
     if (b.x <= a.x) continue;
