@@ -12,7 +12,7 @@
 // Reserve 48px for rotated DD.MM. plus 12px gap above the ring.
 #define CHART_TOP 52
 #define CHART_RIGHT 0
-#define CHART_BOTTOM 79
+#define CHART_BOTTOM 69
 
 static double s_multiplier = 1.0;
 static uint8_t s_pulse_step = 0;
