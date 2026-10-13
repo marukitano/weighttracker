@@ -88,14 +88,9 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int center_y[3] = {36, bounds.size.h / 2, bounds.size.h - 36};
   const int edge_x = bounds.size.w;
-  // Continuous black side rail behind all three button markers and icons.
+  // No rail or divider: paint only black button tabs and symbols.
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  // 2px black divider between the chart and the red control rail.
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(0, 0, 2, bounds.size.h), 0, GCornerNone);
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
@@ -212,7 +207,7 @@ static void initialise_ui(void) {
   // draw_chart_callback derives its geometry from these layer bounds.
   // s_chart
 #ifdef PBL_PLATFORM_EMERY
-  s_chart = layer_create(GRect(0, 0, bounds.size.w - 36, bounds.size.h));
+  s_chart = layer_create(GRect(0, 0, bounds.size.w, bounds.size.h));
 #else
   s_chart = layer_create(GRect(PBL_IF_ROUND_ELSE((bounds.size.w - 144) / 2 - 4, 0), 40, 144, 110));
 #endif
@@ -220,7 +215,7 @@ static void initialise_ui(void) {
 
   // s_textlayer_1
 #ifdef PBL_PLATFORM_EMERY
-  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 72, bounds.size.w - 36, 72));
+  s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - 72, bounds.size.w, 72));
 #else
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
 #endif
