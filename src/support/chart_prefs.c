@@ -20,7 +20,7 @@ GColor chart_prefs_solid_color(void) {
   switch (s_color_mode) {
     case 2: return GColorDarkGreen;
     case 3: return GColorDukeBlue;
-    case 4: return GColorDarkYellow;
+    case 4: return GColorWindsorTan;
     default: return GColorDarkCandyAppleRed;
   }
 }
