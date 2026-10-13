@@ -171,12 +171,12 @@ static void destroy_ui(void) {
   if (s_controls_timer) { app_timer_cancel(s_controls_timer); s_controls_timer = NULL; }
   if (s_controls_press_timer) { app_timer_cancel(s_controls_press_timer); s_controls_press_timer = NULL; }
   if (s_save_timer) { app_timer_cancel(s_save_timer); s_save_timer = NULL; }
-  s_actionbarlayer = NULL;
   window_destroy(s_window);
   text_layer_destroy(s_titlelayer);
   text_layer_destroy(s_edit_date_layer);
   selection_layer_destroy(s_inputlayer);
   action_bar_layer_destroy(s_actionbarlayer);
+  s_actionbarlayer = NULL;
   gbitmap_destroy(s_res_up_arrow);
   gbitmap_destroy(s_res_ok_button);
   gbitmap_destroy(s_res_down_arrow);
