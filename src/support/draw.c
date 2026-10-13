@@ -188,7 +188,7 @@ static void draw_vertical_date(GContext *ctx, const char *label,
   if (x0 > bounds.size.w - 10) x0 = bounds.size.w - 10;
   int bottom = marker.y - 14;
   if (bottom < total_height) bottom = total_height;
-  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_context_set_fill_color(ctx, GColorBlack);
   for (int c = 0; label[c] && c < 6; ++c) {
     int glyph = label[c] == '.' ? 10 : label[c] - '0';
     if (glyph < 0 || glyph > 10) continue;
@@ -242,9 +242,8 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int left = CHART_LEFT;
   const int width = bounds.size.w - 1 - CHART_RIGHT - left;
-  const int top = CHART_TOP;
-  const int height = bounds.size.h - CHART_BOTTOM - top;
-  const int fill_bottom = bounds.size.h - 1;
+  const int top = bounds.size.h / 3;
+  const int height = bounds.size.h / 3;
   const int range = get_chart_range();
   const bool by_days = get_chart_mode() == 1;
   s_color_scale_ready = false;
@@ -324,68 +323,28 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
   }
 
-  // Continuous filled bands: their boundaries stay horizontal even while
-  // the interpolated measurement curve crosses between two readings.
-  bool use_bmi = chart_prefs_color_mode() == 0 &&
-                 chart_prefs_height_cm() >= 100;
-  graphics_context_set_fill_color(ctx, GColorDarkGray);
+  // White canvas, no area fill. Only the smoothed weight line is drawn
+  // within the middle third of the display.
+  graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   int segment = 0;
   int previous_y = points[0].y;
+  bool use_bmi = chart_prefs_color_mode() == 0 &&
+                 chart_prefs_height_cm() >= 100;
   for (int x = points[0].x; x <= points[count - 1].x; ++x) {
-    while (segment + 2 < count && x > points[segment + 1].x)
-      ++segment;
+    while (segment + 2 < count && x > points[segment + 1].x) ++segment;
     int y = smooth_curve_y(points, count, segment, x);
-    if (use_bmi) {
-      // Split each column only at actual BMI threshold pixels. This is
-      // substantially cheaper on a watch than iterating over every pixel.
-      double meters = chart_prefs_height_cm() / 100.0;
-      const double bmi_limits[3] = {30.0, 25.0, 18.5};
-      int run_start = y;
-      for (int k = 0; k < 4; ++k) {
-        int run_end = fill_bottom;
-        if (k < 3) {
-          double threshold = to_current_unit(bmi_limits[k] * meters * meters);
-          int boundary = chart_y(threshold, min_weight, max_weight, top, height);
-          if (boundary < run_start) continue;
-          if (boundary < run_end) run_end = boundary;
-        }
-        if (run_end >= run_start) {
-          int mid = (run_start + run_end) / 2;
-          int band = bmi_band(weight_at_y(mid, min_weight, max_weight, top, height));
-          graphics_context_set_stroke_color(ctx, band_fill(band));
-          graphics_context_set_stroke_width(ctx, 1);
-          graphics_draw_line(ctx, GPoint(x, run_start), GPoint(x, run_end));
-          run_start = run_end + 1;
-        }
-      }
-    } else {
-      graphics_context_set_stroke_color(ctx, chart_prefs_solid_color());
-      graphics_context_set_stroke_width(ctx, 1);
-      graphics_draw_line(ctx, GPoint(x, y), GPoint(x, fill_bottom));
-    }
-    graphics_context_set_stroke_color(ctx,
-      use_bmi ? band_stroke(bmi_band(weight_at_y(y, min_weight, max_weight, top, height)))
-              : chart_prefs_line_color());
-    graphics_context_set_stroke_width(ctx, 2);
-    if (x > points[0].x)
+    if (x > points[0].x) {
+      // Split line at every vertical BMI color transition (when enabled).
+      GColor color = use_bmi
+        ? band_stroke(bmi_band(weight_at_y((previous_y + y) / 2,
+                                             min_weight, max_weight, top, height)))
+        : chart_prefs_line_color();
+      graphics_context_set_stroke_color(ctx, color);
+      graphics_context_set_stroke_width(ctx, 2);
       graphics_draw_line(ctx, GPoint(x - 1, previous_y), GPoint(x, y));
-    previous_y = y;
-  }
-  if (use_bmi) {
-    // Thin, continuous transition lines at the exact BMI values.
-    const double levels[] = {18.5, 25.0, 30.0};
-    double meters = chart_prefs_height_cm() / 100.0;
-    for (int i = 0; i < 3; ++i) {
-      double target = to_current_unit(levels[i] * meters * meters);
-      if (target <= min_weight || target >= max_weight) continue;
-      int boundary_y = chart_y(target, min_weight, max_weight, top, height);
-      graphics_context_set_stroke_width(ctx, 1);
-      graphics_context_set_stroke_color(ctx, GColorWhite);
-      // Solid horizontal guideline: readable over all zone colors.
-      graphics_draw_line(ctx, GPoint(left, boundary_y),
-                         GPoint(left + width, boundary_y));
     }
+    previous_y = y;
   }
 
   // Selected real measurement: thicker red ring with black center.
@@ -417,7 +376,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
       draw_vertical_date(ctx, short_date, marker, bounds);
     }
   }
-  graphics_context_set_fill_color(ctx, CHARTCOLOR);
+  graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_circle(ctx, marker, 8);
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_circle(ctx, marker, 4);
