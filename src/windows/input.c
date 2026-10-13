@@ -7,6 +7,7 @@
 #include "../windows/input.h"
 
 static double s_weight = 80.0;
+static int s_edit_offset = -1;
 static char s_title[15];
 static char s_weigth_str[10];
 
@@ -24,7 +25,10 @@ static char* selection_handle_get_text(int index, void *context) {
 }
 
 static void selection_handle_complete(void *context) {
-  set_current(from_current_unit(s_weight));
+  if (s_edit_offset >= 0)
+    update_history_weight(s_edit_offset, from_current_unit(s_weight));
+  else
+    set_current(from_current_unit(s_weight));
   hide_input();
 }
 
@@ -97,6 +101,7 @@ static void handle_window_unload(Window* window) {
 }
 
 void show_input(void) {
+  s_edit_offset = -1;
   initialise_ui();
 
   window_set_window_handlers(s_window, (WindowHandlers) {
@@ -109,6 +114,20 @@ void show_input(void) {
   snprintf(s_title, sizeof(s_title), "Weight (%s)", get_short_unit_name());
   text_layer_set_text(s_titlelayer, s_title);
 
+  window_stack_push(s_window, true);
+}
+
+void show_input_edit(int newest_offset) {
+  if (newest_offset < 0 || newest_offset >= get_history_count()) return;
+  s_edit_offset = newest_offset;
+  initialise_ui();
+  s_weight = to_current_unit(get_history_weight(newest_offset));
+  s_weight = (double)((int)(s_weight * get_accuracy_multiplier() + 0.5)) / get_accuracy_multiplier();
+  snprintf(s_title, sizeof(s_title), "Weight (%s)", get_short_unit_name());
+  text_layer_set_text(s_titlelayer, s_title);
+  window_set_window_handlers(s_window, (WindowHandlers) {
+    .unload = handle_window_unload,
+  });
   window_stack_push(s_window, true);
 }
 
