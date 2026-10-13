@@ -50,10 +50,17 @@ static void menu_draw_row_callback(GContext* ctx, const Layer *cell_layer, MenuI
       break;
 
     case 4:
-      draw_menu_item(ctx, cell_layer, cell_index, "Chart range", get_chart_days() == 30 ? "Last 30 days" : "Last 15 days");
+      draw_menu_item(ctx, cell_layer, cell_index, "Chart mode",
+                     get_chart_mode() ? "Calendar days" : "Measurements");
       break;
 
     case 5:
+      snprintf(buffer, sizeof(buffer), "%d %s", get_chart_range(),
+               get_chart_mode() ? "days" : "measurements");
+      draw_menu_item(ctx, cell_layer, cell_index, "Chart range", buffer);
+      break;
+
+    case 6:
       draw_menu_item(ctx, cell_layer, cell_index, "About page", NULL);
       break;
   }
@@ -85,10 +92,14 @@ static void menu_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index, v
       break;
 
     case 4:
-        toggle_chart_days();
+        toggle_chart_mode();
         break;
 
     case 5:
+        next_chart_range();
+        break;
+
+    case 6:
         show_welcome();
         break;
   }
