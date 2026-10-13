@@ -210,8 +210,11 @@ void show_input(void) {
   s_weight = to_current_unit(get_latest_weight());
   s_weight = (double)((int)(s_weight * get_accuracy_multiplier() + 0.5)) / get_accuracy_multiplier();
 
-  snprintf(s_title, sizeof(s_title), "Weight (%s)", get_short_unit_name());
-  text_layer_set_text(s_titlelayer, s_title);
+  // New-entry layout: New / selectable weight / unit; no date.
+  text_layer_set_text(s_titlelayer, "New");
+  text_layer_set_text(s_edit_unit_layer,
+                      get_current_unit_index() == 0 ? "kg" : get_short_unit_name());
+  layer_set_hidden(text_layer_get_layer(s_edit_unit_layer), false);
 
   window_stack_push(s_window, true);
 }
