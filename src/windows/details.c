@@ -5,7 +5,7 @@
 #include "../support/parameters.h"
 #include "../windows/details.h"
 
-#define DETAILS_LENGTH 1024
+#define DETAILS_LENGTH 4800
 #define LINE_LENGTH 64
 #define DATE_LENGTH 15
 #define WEIGHT_LENGTH 10
@@ -15,7 +15,7 @@ static const int TEXT_PADDING = 4;
 #ifdef PBL_ROUND
 static const int SCROLL_LAYER_MARGIN = 32;
 #endif
-static const int MAX_TEXT_LAYER_SIZE = 2000;
+static const int MAX_TEXT_LAYER_SIZE = 3200;
 
 static char details[DETAILS_LENGTH + 1] = "";
 
@@ -32,20 +32,22 @@ static void prepare_content(void) {
   static char line[LINE_LENGTH + 1] = "";
   details[0] = '\0';
 
-  for (i = 0; i < get_num_of_days(); i++) {
-    if (get_measured(i)) {
-      date_str(get_date(i), date_s, DATE_LENGTH);
-      double_str(to_current_unit(get_weight(i)), weight_s, WEIGHT_LENGTH);
-      snprintf(line, sizeof(line), "- %s: %s %s", date_s, weight_s, get_short_unit_name());
+  // Include measurements older than the legacy 30-day calendar window.
+  for (i = 0; i < get_history_count(); ++i) {
+    uint32_t date = get_history_date(i);
+    double weight = get_history_weight(i);
+    if (date == 0 || weight <= 0) continue;
+    date_str(date, date_s, DATE_LENGTH);
+    double_str(to_current_unit(weight), weight_s, WEIGHT_LENGTH);
+    snprintf(line, sizeof(line), "- %s: %s %s",
+             date_s, weight_s, get_short_unit_name());
 
-      if (first) {
-        first = 0;
-      } else {
-        strcat(details, "\n");
-      }
-
-      strcat(details, line);
-    }
+    size_t used = strlen(details);
+    size_t needed = strlen(line) + (first ? 0 : 1);
+    if (used + needed >= sizeof(details)) break;
+    if (!first) strcat(details, "\n");
+    strcat(details, line);
+    first = false;
   }
 
   if (first) {
