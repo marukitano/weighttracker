@@ -5,6 +5,7 @@
 #include "../support/draw.h"
 #include "../support/data.h"
 #include "../support/parameters.h"
+#include "../support/chart_prefs.h"
 
 // Time 2 chart: the retro Bayer dither is adapted from OpenLibreLinkUp.
 // The fill grows denser from left (older) to right (newer), with no min/max labels.
@@ -198,6 +199,32 @@ static void draw_vertical_date(GContext *ctx, const char *label,
   }
 }
 
+// The color regions are defined by weight thresholds, not by individual
+// measurements. The smooth curve crosses them at the real intersection.
+static int bmi_band(double display_weight) {
+  int height = chart_prefs_height_cm();
+  if (height < 100) return 2;
+  double meters = height / 100.0;
+  double bmi = from_current_unit(display_weight) / (meters * meters);
+  if (bmi < 18.5) return 1; // underweight: yellow
+  if (bmi < 25.0) return 0; // healthy range: green
+  if (bmi < 30.0) return 1; // overweight: yellow
+  return 2;                // obesity: red
+}
+static GColor band_fill(int band) {
+  if (band == 0) return GColorDarkGreen;
+  if (band == 1) return GColorDarkYellow;
+  return GColorDarkCandyAppleRed;
+}
+static GColor band_stroke(int band) {
+  if (band == 0) return GColorGreen;
+  if (band == 1) return GColorYellow;
+  return GColorRed;
+}
+static double weight_at_y(int y, double min, double max, int top, int height) {
+  return max - ((double)(y - top) / height) * (max - min);
+}
+
 void draw_chart_callback(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int left = CHART_LEFT;
@@ -278,24 +305,62 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
   }
 
-  // Draw the filled area and the outline from the same smooth curve.
+  // Continuous filled bands: their boundaries stay horizontal even while
+  // the interpolated measurement curve crosses between two readings.
+  bool use_bmi = chart_prefs_color_mode() == 0 &&
+                 chart_prefs_height_cm() >= 100;
   graphics_context_set_fill_color(ctx, GColorDarkGray);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  graphics_context_set_stroke_width(ctx, 1);
   int segment = 0;
   int previous_y = points[0].y;
   for (int x = points[0].x; x <= points[count - 1].x; ++x) {
     while (segment + 2 < count && x > points[segment + 1].x)
       ++segment;
     int y = smooth_curve_y(points, count, segment, x);
-    graphics_context_set_stroke_color(ctx, CHARTFILL);
-    graphics_draw_line(ctx, GPoint(x, y), GPoint(x, fill_bottom));
-    graphics_context_set_stroke_color(ctx, CHARTCOLOR);
+    if (use_bmi) {
+      // Draw contiguous vertical runs for each zone rather than colouring
+      // entire data points: a threshold can cross in the middle of a segment.
+      int start = y;
+      int band = bmi_band(weight_at_y(y, min_weight, max_weight, top, height));
+      for (int yy = y + 1; yy <= fill_bottom + 1; ++yy) {
+        int next = yy <= fill_bottom
+          ? bmi_band(weight_at_y(yy, min_weight, max_weight, top, height))
+          : -1;
+        if (next != band) {
+          graphics_context_set_stroke_color(ctx, band_fill(band));
+          graphics_context_set_stroke_width(ctx, 1);
+          graphics_draw_line(ctx, GPoint(x, start), GPoint(x, yy - 1));
+          start = yy;
+          band = next;
+        }
+      }
+    } else {
+      graphics_context_set_stroke_color(ctx, chart_prefs_solid_color());
+      graphics_context_set_stroke_width(ctx, 1);
+      graphics_draw_line(ctx, GPoint(x, y), GPoint(x, fill_bottom));
+    }
+    graphics_context_set_stroke_color(ctx,
+      use_bmi ? band_stroke(bmi_band(weight_at_y(y, min_weight, max_weight, top, height)))
+              : CHARTCOLOR);
     graphics_context_set_stroke_width(ctx, 2);
     if (x > points[0].x)
       graphics_draw_line(ctx, GPoint(x - 1, previous_y), GPoint(x, y));
     previous_y = y;
-    graphics_context_set_stroke_width(ctx, 1);
+  }
+  if (use_bmi) {
+    // Thin, continuous transition lines at the exact BMI values.
+    const double levels[] = {18.5, 25.0, 30.0};
+    double meters = chart_prefs_height_cm() / 100.0;
+    for (int i = 0; i < 3; ++i) {
+      double target = to_current_unit(levels[i] * meters * meters);
+      if (target <= min_weight || target >= max_weight) continue;
+      int boundary_y = chart_y(target, min_weight, max_weight, top, height);
+      graphics_context_set_stroke_width(ctx, 1);
+      graphics_context_set_stroke_color(ctx, GColorWhite);
+      // Solid horizontal guideline: readable over all zone colors.
+      graphics_draw_line(ctx, GPoint(left, boundary_y),
+                         GPoint(left + width, boundary_y));
+    }
   }
 
   // Selected real measurement: thicker red ring with black center.
