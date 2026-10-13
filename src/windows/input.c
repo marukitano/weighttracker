@@ -16,6 +16,8 @@ static GBitmap *s_res_up_arrow;
 static GBitmap *s_res_ok_button;
 static GBitmap *s_res_down_arrow;
 static TextLayer *s_titlelayer;
+static TextLayer *s_edit_date_layer;
+static char s_edit_date_text[24];
 static Layer *s_inputlayer;
 static ActionBarLayer *s_actionbarlayer;
 
@@ -60,6 +62,16 @@ static void initialise_ui(void) {
   action_bar_layer_set_icon(s_actionbarlayer, BUTTON_ID_DOWN, s_res_down_arrow);
   //layer_add_child(window_get_root_layer(s_window), (Layer *)s_actionbarlayer);
 
+  // Existing measurement: show its fixed date above the weight editor.
+  s_edit_date_layer = text_layer_create(GRect(0, (bounds.size.h - 34) / 2 - 59,
+                                            bounds.size.w - ACTION_BAR_WIDTH, 27));
+  text_layer_set_background_color(s_edit_date_layer, GColorClear);
+  text_layer_set_text_color(s_edit_date_layer, GColorWhite);
+  text_layer_set_text_alignment(s_edit_date_layer, GTextAlignmentCenter);
+  text_layer_set_font(s_edit_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  layer_add_child(window_layer, text_layer_get_layer(s_edit_date_layer));
+  layer_set_hidden(text_layer_get_layer(s_edit_date_layer), true);
+
   // s_titlelayer
   s_titlelayer = text_layer_create(GRect(0, (bounds.size.h - 34) / 2 - 28, bounds.size.w - ACTION_BAR_WIDTH, 24));
   text_layer_set_background_color(s_titlelayer, GColorClear);
@@ -89,6 +101,7 @@ static void initialise_ui(void) {
 static void destroy_ui(void) {
   window_destroy(s_window);
   text_layer_destroy(s_titlelayer);
+  text_layer_destroy(s_edit_date_layer);
   selection_layer_destroy(s_inputlayer);
   action_bar_layer_destroy(s_actionbarlayer);
   gbitmap_destroy(s_res_up_arrow);
@@ -121,6 +134,13 @@ void show_input_edit(int newest_offset) {
   if (newest_offset < 0 || newest_offset >= get_history_count()) return;
   s_edit_offset = newest_offset;
   initialise_ui();
+  uint32_t date = get_history_date(newest_offset);
+  snprintf(s_edit_date_text, sizeof(s_edit_date_text), "%02lu.%02lu.%04lu",
+           (unsigned long)(date % 100),
+           (unsigned long)((date / 100) % 100),
+           (unsigned long)(date / 10000));
+  text_layer_set_text(s_edit_date_layer, s_edit_date_text);
+  layer_set_hidden(text_layer_get_layer(s_edit_date_layer), false);
   s_weight = to_current_unit(get_history_weight(newest_offset));
   s_weight = (double)((int)(s_weight * get_accuracy_multiplier() + 0.5)) / get_accuracy_multiplier();
   snprintf(s_title, sizeof(s_title), "Weight (%s)", get_short_unit_name());
