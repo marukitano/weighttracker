@@ -134,9 +134,7 @@ static void initialise_ui() {
   s_scrolllayer = scroll_layer_create(GRect(0, 0, bounds.size.w - 36, bounds.size.h));
 #endif
 
-  // This binds the scroll layer to the window so that up and down map to scrolling
-  // You may use scroll_layer_set_callbacks to add or override interactivity
-  scroll_layer_set_click_config_onto_window(s_scrolllayer, s_window);
+  // UP/DOWN scroll the list; SELECT is configured separately to add a reading.
 
   // Initialize the text layer
   s_textlayer_1 = text_layer_create(max_text_bounds);
