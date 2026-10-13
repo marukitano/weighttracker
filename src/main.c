@@ -146,7 +146,7 @@ static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
                          GTextAlignmentCenter, NULL);
     }
   }
-  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_context_set_text_color(ctx, GColorWhite);
   graphics_draw_text(ctx, label, font, rect,
                      GTextOverflowModeTrailingEllipsis,
                      GTextAlignmentCenter, NULL);
