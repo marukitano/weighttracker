@@ -41,6 +41,7 @@ void toggle_chart_days(void);
 int get_history_count(void);
 double get_history_weight(int newest_offset);
 uint32_t get_history_date(int newest_offset);
+bool update_history_weight(int newest_offset, double weight);
 int get_chart_mode(void); // 0 = measurements, 1 = calendar days
 void toggle_chart_mode(void);
 void next_chart_range(void);
