@@ -129,8 +129,9 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 2);
   if (s_entry_shift >= 30) return;
   for (int i = 0; i < 3; ++i) {
-    graphics_fill_rect(ctx, GRect(right - s_press_width[i] + s_entry_shift,
-                                 centers[i] - 26, s_press_width[i], 52),
+    int width = s_press_width[i] + (s_entry_shift > 0 ? s_entry_shift : 0);
+    graphics_fill_rect(ctx, GRect(right - width,
+                                 centers[i] - 26, width, 52),
                        5, GCornersLeft);
     const int mid_x = right - 21 + s_entry_shift;
     if (i == 1) {
@@ -157,7 +158,8 @@ static void back_marker_update(Layer *layer, GContext *ctx) {
   if (s_entry_shift >= 30) return;
   int cx = 15 - s_entry_shift, cy = 36;
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(0, 10, 5, 52), 5, GCornersRight);
+  graphics_fill_rect(ctx, GRect(0, 10, 5 + (s_entry_shift > 0 ? s_entry_shift : 0), 52),
+                     5, GCornersRight);
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
   // Return arrow points left (not an X).
