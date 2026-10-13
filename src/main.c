@@ -164,30 +164,34 @@ static void format_history_weight(int offset, char *out, size_t len) {
 }
 
 // Render the mask text with a one-pixel chart-red outline.
-static GColor outline_for_offset(int offset) {
-  if (chart_prefs_color_mode() != 0 || chart_prefs_height_cm() < 100)
-    return chart_prefs_line_color();
-  double weight = get_chart_history_weight(offset);
-  if (weight <= 0) return chart_prefs_line_color();
-  double m = chart_prefs_height_cm() / 100.0;
-  double bmi = weight / (m * m);
-  if (bmi < 18.5 || (bmi >= 25.0 && bmi < 30.0)) return GColorYellow;
-  return bmi < 25.0 ? GColorGreen : GColorRed;
-}
-
+// Draw each portion of the numeral outline with the color of the BMI
+// band at precisely the same vertical display coordinate.
 static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
-                                 GRect rect, GColor color) {
-  graphics_context_set_text_color(ctx, color);
-  for (int dy = -2; dy <= 2; ++dy) {
-    for (int dx = -2; dx <= 2; ++dx) {
-      if (dx == 0 && dy == 0) continue;
-      graphics_draw_text(ctx, label, font,
-                         GRect(rect.origin.x + dx, rect.origin.y + dy,
-                               rect.size.w, rect.size.h),
-                         GTextOverflowModeTrailingEllipsis,
-                         GTextAlignmentCenter, NULL);
+                                 GRect rect, GRect clip_bounds,
+                                 int absolute_top) {
+  int local_y = 0;
+  while (local_y < clip_bounds.size.h) {
+    GColor color = chart_outline_color_at_y(absolute_top + local_y);
+    int end = local_y + 1;
+    while (end < clip_bounds.size.h &&
+           chart_outline_color_at_y(absolute_top + end).argb == color.argb)
+      ++end;
+    graphics_context_set_clip_rect(ctx, GRect(0, local_y,
+                                             clip_bounds.size.w, end - local_y));
+    graphics_context_set_text_color(ctx, color);
+    for (int dy = -2; dy <= 2; ++dy) {
+      for (int dx = -2; dx <= 2; ++dx) {
+        if (dx == 0 && dy == 0) continue;
+        graphics_draw_text(ctx, label, font,
+                           GRect(rect.origin.x + dx, rect.origin.y + dy,
+                                 rect.size.w, rect.size.h),
+                           GTextOverflowModeTrailingEllipsis,
+                           GTextAlignmentCenter, NULL);
+      }
     }
+    local_y = end;
   }
+  graphics_context_set_clip_rect(ctx, clip_bounds);
   graphics_context_set_text_color(ctx, GColorWhite);
   graphics_draw_text(ctx, label, font, rect,
                      GTextOverflowModeTrailingEllipsis,
@@ -197,16 +201,21 @@ static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
 static void weight_slide_draw(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int height = bounds.size.h;
+  const int absolute_top = layer_get_frame(layer).origin.y;
   GFont font = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
   if (!s_slide_running) {
-    draw_outlined_weight(ctx, s_new_weight_text, font, bounds, outline_for_offset(s_history_offset));
+    draw_outlined_weight(ctx, s_new_weight_text, font, bounds, bounds,
+                         absolute_top);
     return;
   }
   int travel = (height * s_slide_frame) / 8;
   draw_outlined_weight(ctx, s_old_weight_text, font,
-                       GRect(0, -s_slide_direction * travel, bounds.size.w, height), outline_for_offset(s_history_offset));
+                       GRect(0, -s_slide_direction * travel, bounds.size.w, height),
+                       bounds, absolute_top);
   draw_outlined_weight(ctx, s_new_weight_text, font,
-                       GRect(0, s_slide_direction * (height - travel), bounds.size.w, height), outline_for_offset(s_incoming_offset));
+                       GRect(0, s_slide_direction * (height - travel),
+                             bounds.size.w, height),
+                       bounds, absolute_top);
 }
 
 static void slide_tick(void *context) {
