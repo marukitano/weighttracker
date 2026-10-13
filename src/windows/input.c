@@ -20,6 +20,35 @@ static TextLayer *s_edit_date_layer;
 static char s_edit_date_text[24];
 static Layer *s_inputlayer;
 static ActionBarLayer *s_actionbarlayer;
+static AppTimer *s_controls_timer;
+static AppTimer *s_controls_delay;
+static uint8_t s_controls_step;
+static int16_t s_controls_offset = 30;
+static GRect s_controls_frame;
+static const int8_t s_controls_bounce[] = {30, 18, 8, -3, 2, -1, 0};
+
+static void controls_bounce_tick(void *context) {
+  s_controls_timer = NULL;
+  if (!s_actionbarlayer) return;
+  if (s_controls_step < sizeof(s_controls_bounce) - 1) ++s_controls_step;
+  s_controls_offset = s_controls_bounce[s_controls_step];
+  layer_set_frame(action_bar_layer_get_layer(s_actionbarlayer),
+                  GRect(s_controls_frame.origin.x + s_controls_offset,
+                        s_controls_frame.origin.y,
+                        s_controls_frame.size.w, s_controls_frame.size.h));
+  if (s_controls_step < sizeof(s_controls_bounce) - 1)
+    s_controls_timer = app_timer_register(42, controls_bounce_tick, NULL);
+}
+static void controls_start(void *context) {
+  s_controls_delay = NULL;
+  s_controls_step = 0;
+  s_controls_timer = app_timer_register(42, controls_bounce_tick, NULL);
+}
+static void controls_appear(Window *window) {
+  if (!s_controls_delay)
+    s_controls_delay = app_timer_register(500, controls_start, NULL);
+}
+
 
 static char* selection_handle_get_text(int index, void *context) {
   double_str(s_weight, s_weigth_str, sizeof(s_weigth_str));
@@ -56,6 +85,12 @@ static void initialise_ui(void) {
 
   s_actionbarlayer = action_bar_layer_create();
   action_bar_layer_add_to_window(s_actionbarlayer, s_window);
+  s_controls_frame = layer_get_frame(action_bar_layer_get_layer(s_actionbarlayer));
+  s_controls_offset = 30;
+  s_controls_step = 0;
+  layer_set_frame(action_bar_layer_get_layer(s_actionbarlayer),
+                  GRect(s_controls_frame.origin.x + 30, s_controls_frame.origin.y,
+                        s_controls_frame.size.w, s_controls_frame.size.h));
   action_bar_layer_set_background_color(s_actionbarlayer, GColorBlack);
   action_bar_layer_set_icon(s_actionbarlayer, BUTTON_ID_UP, s_res_up_arrow);
   action_bar_layer_set_icon(s_actionbarlayer, BUTTON_ID_SELECT, s_res_ok_button);
@@ -99,6 +134,8 @@ static void initialise_ui(void) {
 }
 
 static void destroy_ui(void) {
+  if (s_controls_delay) { app_timer_cancel(s_controls_delay); s_controls_delay = NULL; }
+  if (s_controls_timer) { app_timer_cancel(s_controls_timer); s_controls_timer = NULL; }
   window_destroy(s_window);
   text_layer_destroy(s_titlelayer);
   text_layer_destroy(s_edit_date_layer);
@@ -119,6 +156,7 @@ void show_input(void) {
 
   window_set_window_handlers(s_window, (WindowHandlers) {
     .unload = handle_window_unload,
+    .appear = controls_appear,
   });
 
   s_weight = to_current_unit(get_latest_weight());
@@ -147,6 +185,7 @@ void show_input_edit(int newest_offset) {
   text_layer_set_text(s_titlelayer, s_title);
   window_set_window_handlers(s_window, (WindowHandlers) {
     .unload = handle_window_unload,
+    .appear = controls_appear,
   });
   window_stack_push(s_window, true);
 }
