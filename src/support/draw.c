@@ -44,7 +44,10 @@ double get_chart_history_weight(int offset) {
   return i < 0 ? -1 : get_history_weight(i);
 }
 int get_chart_history_count(void) {
-  if (get_chart_mode() == 0) return get_history_count();
+  if (get_chart_mode() == 0) {
+    int count = get_history_count();
+    return count < get_chart_range() ? count : get_chart_range();
+  }
   int count = 0;
   for (int i = 0; i < get_history_count(); ++i) {
     long age = days(get_history_date(i), get_current_date());
