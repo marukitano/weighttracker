@@ -108,9 +108,10 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   for (int i = 0; i < 3; ++i) {
     if (s_button_enter_x[i] >= 30) continue;
     int shift = s_button_enter_x[i];
-    int marker_width = s_button_width[i];
+    // Swiss Chronograph: stretch the tab back to the physical edge.
+    int marker_width = s_button_width[i] + (shift > 0 ? shift : 0);
     graphics_fill_rect(ctx,
-                       GRect(edge_x - marker_width + shift, center_y[i] - 26,
+                       GRect(edge_x - marker_width, center_y[i] - 26,
                              marker_width, 52),
                        5, GCornersLeft);
     const int icon_right = edge_x - 14 + shift;
@@ -140,7 +141,8 @@ static void back_marker_update(Layer *layer, GContext *ctx) {
   if (s_button_enter_x[0] >= 30) return;
   int shift = s_button_enter_x[0];
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(0, 10, 5, 52), 5, GCornersRight);
+  graphics_fill_rect(ctx, GRect(0, 10, 5 + (shift > 0 ? shift : 0), 52),
+                     5, GCornersRight);
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
   int cx = 15 - shift, cy = 36;
