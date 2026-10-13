@@ -61,11 +61,12 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int centers[3] = {36, bounds.size.h / 2, bounds.size.h - 36};
   const int right = bounds.size.w;
-  graphics_context_set_fill_color(ctx, GColorRed);
+  graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_fill_color(ctx, GColorBlack);
   graphics_fill_rect(ctx, GRect(0, 0, 2, bounds.size.h), 0, GCornerNone);
-  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_stroke_width(ctx, 2);
   for (int i = 0; i < 3; ++i) {
     graphics_fill_rect(ctx, GRect(right - 5, centers[i] - 26, 5, 52),
