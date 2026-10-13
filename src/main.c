@@ -166,32 +166,43 @@ static void format_history_weight(int offset, char *out, size_t len) {
 // Render the mask text with a one-pixel chart-red outline.
 // Draw each portion of the numeral outline with the color of the BMI
 // band at precisely the same vertical display coordinate.
+// Paint the outline in a temporary marker color, then recolor its pixels
+// using the exact BMI band at each absolute framebuffer row. Pebble has
+// no graphics_context_set_clip_rect() API.
 static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
                                  GRect rect, GRect clip_bounds,
                                  int absolute_top) {
-  int local_y = 0;
-  while (local_y < clip_bounds.size.h) {
-    GColor color = chart_outline_color_at_y(absolute_top + local_y);
-    int end = local_y + 1;
-    while (end < clip_bounds.size.h &&
-           chart_outline_color_at_y(absolute_top + end).argb == color.argb)
-      ++end;
-    graphics_context_set_clip_rect(ctx, GRect(0, local_y,
-                                             clip_bounds.size.w, end - local_y));
-    graphics_context_set_text_color(ctx, color);
-    for (int dy = -2; dy <= 2; ++dy) {
-      for (int dx = -2; dx <= 2; ++dx) {
-        if (dx == 0 && dy == 0) continue;
-        graphics_draw_text(ctx, label, font,
-                           GRect(rect.origin.x + dx, rect.origin.y + dy,
-                                 rect.size.w, rect.size.h),
-                           GTextOverflowModeTrailingEllipsis,
-                           GTextAlignmentCenter, NULL);
+  graphics_context_set_text_color(ctx, GColorMagenta);
+  for (int dy = -2; dy <= 2; ++dy) {
+    for (int dx = -2; dx <= 2; ++dx) {
+      if (dx == 0 && dy == 0) continue;
+      graphics_draw_text(ctx, label, font,
+                         GRect(rect.origin.x + dx, rect.origin.y + dy,
+                               rect.size.w, rect.size.h),
+                         GTextOverflowModeTrailingEllipsis,
+                         GTextAlignmentCenter, NULL);
+    }
+  }
+
+  GBitmap *framebuffer = graphics_capture_frame_buffer(ctx);
+  if (framebuffer) {
+    int top = absolute_top < 0 ? 0 : absolute_top;
+    int bottom = absolute_top + clip_bounds.size.h;
+    GRect fb_bounds = gbitmap_get_bounds(framebuffer);
+    if (bottom > fb_bounds.size.h) bottom = fb_bounds.size.h;
+    for (int y = top; y < bottom; ++y) {
+      GBitmapDataRowInfo row = gbitmap_get_data_row_info(framebuffer, y);
+      GColor color = chart_outline_color_at_y(y);
+      int left = row.min_x > 0 ? row.min_x : 0;
+      int right = row.max_x < fb_bounds.size.w - 1 ?
+                  row.max_x : fb_bounds.size.w - 1;
+      for (int x = left; x <= right; ++x) {
+        if (row.data[x] == GColorMagenta.argb)
+          row.data[x] = color.argb;
       }
     }
-    local_y = end;
+    graphics_release_frame_buffer(ctx, framebuffer);
   }
-  graphics_context_set_clip_rect(ctx, clip_bounds);
   graphics_context_set_text_color(ctx, GColorWhite);
   graphics_draw_text(ctx, label, font, rect,
                      GTextOverflowModeTrailingEllipsis,
