@@ -13,7 +13,7 @@
 #define LOG_INFO(...)
 #endif
 
-#define BACKGROUND GColorBlack
+#define BACKGROUND GColorDarkGray
 #define FOREGROUND GColorWhite
 // #define CURSOR PBL_IF_COLOR_ELSE(GColorDarkGray, GColorDarkGray)
 #define HIGHLIGHT PBL_IF_COLOR_ELSE(GColorRed, GColorWhite)
