@@ -21,6 +21,7 @@ static TextLayer *s_edit_unit_layer;
 static char s_edit_date_text[24];
 static Layer *s_inputlayer;
 static ActionBarLayer *s_actionbarlayer;
+static Layer *s_delete_marker;
 static AppTimer *s_controls_timer;
 static AppTimer *s_controls_delay;
 static AppTimer *s_controls_press_timer;
@@ -107,6 +108,29 @@ static void selection_handle_inc(int index, uint8_t clicks, void *context) {
   s_weight += get_accuracy_step();
 }
 
+// Left hardware Back is Delete only while editing an existing reading.
+static void delete_back_click(ClickRecognizerRef recognizer, void *context) {
+  if (s_edit_offset < 0) return;
+  if (delete_history_weight(s_edit_offset)) hide_input();
+}
+
+static void edit_click_config(void *context) {
+  window_single_click_subscribe(BUTTON_ID_BACK, delete_back_click);
+}
+
+static void delete_marker_draw(Layer *layer, GContext *ctx) {
+  if (s_edit_offset < 0) return;
+  GRect bounds = layer_get_bounds(layer);
+  graphics_context_set_fill_color(ctx, GColorRed);
+  // Half circle projecting right from the left edge.
+  graphics_fill_circle(ctx, GPoint(0, bounds.size.h / 2), 26);
+  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_context_set_stroke_width(ctx, 3);
+  int cy = bounds.size.h / 2;
+  graphics_draw_line(ctx, GPoint(9, cy - 7), GPoint(21, cy + 7));
+  graphics_draw_line(ctx, GPoint(9, cy + 7), GPoint(21, cy - 7));
+}
+
 static void initialise_ui(void) {
   s_window = window_create();
 
@@ -175,6 +199,12 @@ static void initialise_ui(void) {
     .decrement = selection_handle_dec,
   });
   layer_add_child(window_get_root_layer(s_window), s_inputlayer);
+  if (s_edit_offset >= 0) {
+    s_delete_marker = layer_create(GRect(0, 10, 32, 52));
+    layer_set_update_proc(s_delete_marker, delete_marker_draw);
+    layer_add_child(window_layer, s_delete_marker);
+    window_set_click_config_provider(s_window, edit_click_config);
+  }
 }
 
 static void destroy_ui(void) {
@@ -183,6 +213,7 @@ static void destroy_ui(void) {
   if (s_controls_press_timer) { app_timer_cancel(s_controls_press_timer); s_controls_press_timer = NULL; }
   if (s_save_timer) { app_timer_cancel(s_save_timer); s_save_timer = NULL; }
   window_destroy(s_window);
+  if (s_delete_marker) { layer_destroy(s_delete_marker); s_delete_marker = NULL; }
   text_layer_destroy(s_titlelayer);
   text_layer_destroy(s_edit_date_layer);
   text_layer_destroy(s_edit_unit_layer);
