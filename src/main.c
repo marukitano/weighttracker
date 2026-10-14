@@ -40,6 +40,9 @@ static TextLayer *s_textlayer_1;
 static Layer *s_chart;
 static Layer *s_button_marker;
 static Layer *s_back_marker;
+static AppTimer *s_back_expand_timer;
+static bool s_back_expanded = false;
+static uint8_t s_back_width = 5;
 static AppTimer *s_button_anim_timer;
 static uint8_t s_button_width[3] = {5, 5, 5};
 // 36px offscreen -> small overshoot -> settle, with staggered entrance.
@@ -137,17 +140,45 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
 
 // Swiss Chronograph: left-edge action at y=36, 5x52px, right-rounded.
 // Mirror the right-hand button bounce so the back action flies in from left.
+static void back_expand_tick(void *context) {
+  s_back_expand_timer = NULL;
+  const int target = s_back_expanded ? 35 : 5;
+  if (s_back_width < target) {
+    s_back_width += 5;
+    if (s_back_width > target) s_back_width = target;
+  } else if (s_back_width > target) {
+    s_back_width = s_back_width > 10 ? s_back_width - 5 : 5;
+    if (s_back_width < target) s_back_width = target;
+  }
+  if (s_back_marker) layer_mark_dirty(s_back_marker);
+  if (s_back_width != target)
+    s_back_expand_timer = app_timer_register(35, back_expand_tick, NULL);
+}
+
+static void back_expand_set(bool expanded) {
+  s_back_expanded = expanded;
+  if (s_back_expand_timer) app_timer_cancel(s_back_expand_timer);
+  s_back_expand_timer = app_timer_register(1, back_expand_tick, NULL);
+}
+
 static void back_marker_update(Layer *layer, GContext *ctx) {
   if (s_button_enter_x[0] >= 30) return;
   int shift = s_button_enter_x[0];
+  int width = s_back_width + (shift > 0 ? shift : 0);
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(0, 10, 5 + (shift > 0 ? shift : 0), 52),
-                     5, GCornersRight);
+  graphics_fill_rect(ctx, GRect(0, 10, width, 52), 5, GCornersRight);
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
   int cx = 15 - shift, cy = 36;
-  graphics_draw_line(ctx, GPoint(cx + 4, cy - 6), GPoint(cx - 3, cy));
-  graphics_draw_line(ctx, GPoint(cx - 3, cy), GPoint(cx + 4, cy + 6));
+  if (s_back_expanded) {
+    // White X replaces and covers the old left arrow within the extended tab.
+    graphics_context_set_stroke_color(ctx, GColorWhite);
+    graphics_draw_line(ctx, GPoint(13, cy - 7), GPoint(25, cy + 7));
+    graphics_draw_line(ctx, GPoint(13, cy + 7), GPoint(25, cy - 7));
+  } else {
+    graphics_draw_line(ctx, GPoint(cx + 4, cy - 6), GPoint(cx - 3, cy));
+    graphics_draw_line(ctx, GPoint(cx - 3, cy), GPoint(cx + 4, cy + 6));
+  }
 }
 
 // Two independent weight captions slide through a clipped display window.
@@ -361,6 +392,7 @@ static void destroy_ui(void) {
     s_button_anim_timer = NULL;
   }
   layer_destroy(s_button_marker);
+  if (s_back_expand_timer) { app_timer_cancel(s_back_expand_timer); s_back_expand_timer = NULL; }
   layer_destroy(s_back_marker);
   s_back_marker = NULL;
   if (s_weight_animation_timer) {
@@ -436,10 +468,19 @@ static void back_left_click(ClickRecognizerRef recognizer, void *context) {
   change_history(1);
 }
 
+static void back_long_click(ClickRecognizerRef recognizer, void *context) {
+  back_expand_set(true);
+}
+
+static void back_long_release(ClickRecognizerRef recognizer, void *context) {
+  back_expand_set(false);
+}
+
 static void click_config_provider(void *context) {
   window_raw_click_subscribe(BUTTON_ID_UP, button_raw_down, button_raw_up, NULL);
   window_raw_click_subscribe(BUTTON_ID_SELECT, button_raw_down, button_raw_up, NULL);
   window_single_click_subscribe(BUTTON_ID_BACK, back_left_click);
+  window_long_click_subscribe(BUTTON_ID_BACK, 500, back_long_click, back_long_release);
 
 }
 
@@ -481,6 +522,8 @@ static void show_main(void) {
     s_button_entering[i] = false;
   }
   s_buttons_introduced = false;
+  s_back_expanded = false;
+  s_back_width = 5;
   s_active_button = -1;
   s_button_held = false;
   s_history_offset = 0;
