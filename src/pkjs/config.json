@@ -70,9 +70,10 @@
         "messageKey": "CHART_RANGE",
         "label": "Number of measurements or days",
         "defaultValue": 10,
-        "min": 2,
+        "min": 4,
         "max": 30,
-        "step": 1
+        "step": 1,
+        "description": "Number of older readings or days to the left of the selected point (4–30)."
       },
       {
         "type": "select",
