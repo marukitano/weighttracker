@@ -6,6 +6,10 @@ A lightweight weight-tracking app for the **Pebble Time 2**. Record your weight 
 
 This project adapts the original **WeightTracker** by **Viktor Csala** for the Pebble Time 2 (`emery`, 200 × 228 px).
 
+<p align="center">
+  <img src="assets/emery/preview.png" alt="WeightTracker on Pebble Time 2" width="360">
+</p>
+
 ## English
 
 ### Features
