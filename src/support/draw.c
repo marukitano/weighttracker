@@ -45,6 +45,9 @@ static int visible_offset(int offset) {
   }
   return -1;
 }
+int get_chart_history_index(int offset) {
+  return visible_offset(offset);
+}
 double get_chart_history_weight(int offset) {
   int i = visible_offset(offset);
   return i < 0 ? -1 : get_history_weight(i);
