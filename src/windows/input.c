@@ -187,6 +187,18 @@ static void draw_pixel_weight(GContext *ctx, const char *value, int width) {
   }
 }
 
+// Draw the edit/delete X one pixel column at a time. Its portion covered
+// by the expanding red tab turns white, while the uncovered part stays red.
+static void draw_delete_x_stroke(GContext *ctx, int x1, int y1,
+                                 int x2, int y2, int red_edge) {
+  int dx = x2 - x1;
+  for (int x = x1; x <= x2; ++x) {
+    int y = y1 + (y2 - y1) * (x - x1) / dx;
+    graphics_context_set_fill_color(ctx, x >= red_edge ? GColorWhite : GColorRed);
+    graphics_fill_rect(ctx, GRect(x, y, 2, 2), 0, GCornerNone);
+  }
+}
+
 static void draw_canvas(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int ruler_x = 0;
@@ -248,10 +260,11 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     graphics_context_set_stroke_color(ctx, action_color);
     graphics_context_set_stroke_width(ctx, 2);
     if (s_edit_offset >= 0) {
-      graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y - 7),
-                         GPoint(edge_x - 12 + shift, bottom_y + 7));
-      graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y + 7),
-                         GPoint(edge_x - 12 + shift, bottom_y - 7));
+      int red_edge = edge_x - bottom_width;
+      draw_delete_x_stroke(ctx, edge_x - 24 + shift, bottom_y - 7,
+                           edge_x - 12 + shift, bottom_y + 7, red_edge);
+      draw_delete_x_stroke(ctx, edge_x - 24 + shift, bottom_y + 7,
+                           edge_x - 12 + shift, bottom_y - 7, red_edge);
     } else {
       graphics_draw_line(ctx, GPoint(edge_x - 23 + shift, bottom_y),
                          GPoint(edge_x - 18 + shift, bottom_y + 5));
