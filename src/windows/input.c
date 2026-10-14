@@ -187,15 +187,22 @@ static void draw_pixel_weight(GContext *ctx, const char *value, int width) {
   }
 }
 
-// Draw the edit/delete X one pixel column at a time. Its portion covered
-// by the expanding red tab turns white, while the uncovered part stays red.
-static void draw_delete_x_stroke(GContext *ctx, int x1, int y1,
-                                 int x2, int y2, int red_edge) {
-  int dx = x2 - x1;
-  for (int x = x1; x <= x2; ++x) {
-    int y = y1 + (y2 - y1) * (x - x1) / dx;
-    graphics_context_set_fill_color(ctx, x >= red_edge ? GColorWhite : GColorRed);
-    graphics_fill_rect(ctx, GRect(x, y, 2, 2), 0, GCornerNone);
+// Pixel-art trash can. Every drawn pixel changes from red to white as
+// the expanding red delete tab reaches its column.
+static void draw_trash_icon(GContext *ctx, int x, int y, int red_edge) {
+  static const uint16_t rows[17] = {
+    0x0070, 0x0070, 0x03FC, 0x03FC,
+    0x0FFE, 0x0FFE, 0x07FC, 0x07FC,
+    0x066C, 0x066C, 0x066C, 0x066C,
+    0x066C, 0x066C, 0x07FC, 0x07FC, 0x03F8
+  };
+  for (int row = 0; row < 17; ++row) {
+    for (int col = 0; col < 12; ++col) {
+      if (!(rows[row] & (1 << (11 - col)))) continue;
+      int px = x + col;
+      graphics_context_set_fill_color(ctx, px >= red_edge ? GColorWhite : GColorRed);
+      graphics_fill_rect(ctx, GRect(px, y + row, 1, 1), 0, GCornerNone);
+    }
   }
 }
 
@@ -261,10 +268,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     graphics_context_set_stroke_width(ctx, 2);
     if (s_edit_offset >= 0) {
       int red_edge = edge_x - bottom_width;
-      draw_delete_x_stroke(ctx, edge_x - 24 + shift, bottom_y - 7,
-                           edge_x - 12 + shift, bottom_y + 7, red_edge);
-      draw_delete_x_stroke(ctx, edge_x - 24 + shift, bottom_y + 7,
-                           edge_x - 12 + shift, bottom_y - 7, red_edge);
+      draw_trash_icon(ctx, edge_x - 24 + shift, bottom_y - 8, red_edge);
     } else {
       graphics_draw_line(ctx, GPoint(edge_x - 23 + shift, bottom_y),
                          GPoint(edge_x - 18 + shift, bottom_y + 5));
