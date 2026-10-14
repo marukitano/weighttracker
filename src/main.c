@@ -641,7 +641,8 @@ void init() {
   app_message_register_inbox_received(config_received);
   app_message_register_outbox_sent(export_outbox_sent);
   app_message_register_outbox_failed(export_outbox_failed);
-  app_message_open(256, 64);
+  // Export packets contain up to five readings (about 90 bytes).
+  app_message_open(256, 256);
   wakeup_service_subscribe(wakeup_handler);
 }
 
