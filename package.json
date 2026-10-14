@@ -37,7 +37,9 @@
       "UNIT": 64,
       "EXPORT_REQUEST": 70,
       "EXPORT_DATA": 71,
-      "EXPORT_DONE": 72
+      "EXPORT_DONE": 72,
+      "LABEL_ABOVE": 73,
+      "LABEL_BELOW": 74
     },
     "resources": {
       "media": [
