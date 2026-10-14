@@ -11,7 +11,7 @@
 #define KEY_UNIT 64
 #define KEY_ABOVE 65
 #define KEY_BELOW 66
-#define MIN_RANGE 2
+#define MIN_RANGE 4
 #define MAX_RANGE 30
 
 static int s_height_cm;
