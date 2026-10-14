@@ -29,6 +29,10 @@ static AppTimer *s_button_bounce_timer;
 static uint8_t s_button_bounce_frame;
 static int8_t s_button_bounce_x = 30;
 static const int8_t BUTTON_BOUNCE_X[] = {30, 18, 8, -3, 2, -1, 0};
+static AppTimer *s_button_press_timer;
+static int8_t s_button_active = -1; // 0=Select, 1=Down
+static bool s_button_held;
+static uint8_t s_button_width[2] = {5, 5};
 
 static int clamp_value(int value) {
   if (value < VALUE_MIN) return VALUE_MIN;
@@ -235,10 +239,11 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     const int edge_x = bounds.size.w;
     const int center_y = bounds.size.h / 2;
     const int bottom_y = bounds.size.h - 36;
-    const int marker_width = 5 + (shift > 0 ? shift : 0);
+    const int middle_width = s_button_width[0] + (shift > 0 ? shift : 0);
+    const int bottom_width = s_button_width[1] + (shift > 0 ? shift : 0);
     graphics_context_set_fill_color(ctx, GColorBlack);
     graphics_fill_rect(ctx,
-      GRect(edge_x - marker_width, center_y - 26, marker_width, 52),
+      GRect(edge_x - middle_width, center_y - 26, middle_width, 52),
       5, GCornersLeft);
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_stroke_width(ctx, 2);
@@ -250,7 +255,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     GColor action_color = s_edit_offset >= 0 ? GColorRed : GColorBlack;
     graphics_context_set_fill_color(ctx, action_color);
     graphics_fill_rect(ctx,
-      GRect(edge_x - marker_width, bottom_y - 26, marker_width, 52),
+      GRect(edge_x - bottom_width, bottom_y - 26, bottom_width, 52),
       5, GCornersLeft);
     graphics_context_set_stroke_color(ctx, action_color);
     graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y - 7),
@@ -260,39 +265,76 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   }
 }
 
-static void save_click(ClickRecognizerRef recognizer, void *context) {
-  if (s_confirm_delete) {
-    s_confirm_delete = false;
-    refresh();
-    return;
+static void perform_button_action(int button) {
+  if (button == 0) {
+    // Select: save, or dismiss the pending deletion prompt.
+    if (s_confirm_delete) {
+      s_confirm_delete = false;
+      refresh();
+      return;
+    }
+    double weight = (double)s_tenths / 10.0;
+    if (s_edit_offset >= 0)
+      update_history_weight(s_edit_offset, from_current_unit(weight));
+    else
+      set_current(from_current_unit(weight));
+    window_stack_pop(true);
+  } else {
+    // Down: cancel a new value, or require confirmation before deleting.
+    if (s_edit_offset < 0) {
+      window_stack_pop(true);
+    } else if (!s_confirm_delete) {
+      s_confirm_delete = true;
+      refresh();
+    } else {
+      delete_history_weight(s_edit_offset);
+      window_stack_pop(true);
+    }
   }
-  double weight = (double)s_tenths / 10.0;
-  if (s_edit_offset >= 0)
-    update_history_weight(s_edit_offset, from_current_unit(weight));
-  else
-    set_current(from_current_unit(weight));
-  window_stack_pop(true);
 }
 
-static void cancel_or_delete_click(ClickRecognizerRef recognizer, void *context) {
-  if (s_edit_offset < 0) {
-    window_stack_pop(true);
-    return;
-  }
-  if (!s_confirm_delete) {
-    s_confirm_delete = true;
+static void button_press_tick(void *context) {
+  s_button_press_timer = NULL;
+  if (s_button_active < 0) return;
+  int button = s_button_active;
+  if (s_button_held) {
+    if (s_button_width[button] < 7) ++s_button_width[button];
     refresh();
-    return;
+    if (s_button_width[button] < 7)
+      s_button_press_timer = app_timer_register(55, button_press_tick, NULL);
+  } else if (s_button_width[button] > 5) {
+    --s_button_width[button];
+    refresh();
+    s_button_press_timer = app_timer_register(55, button_press_tick, NULL);
+  } else {
+    s_button_active = -1;
+    perform_button_action(button);
   }
-  delete_history_weight(s_edit_offset);
-  window_stack_pop(true);
+}
+
+static void button_raw_down(ClickRecognizerRef recognizer, void *context) {
+  ButtonId id = click_recognizer_get_button_id(recognizer);
+  int button = id == BUTTON_ID_SELECT ? 0 : id == BUTTON_ID_DOWN ? 1 : -1;
+  if (button < 0 || s_button_active >= 0 || s_button_bounce_x != 0) return;
+  s_button_active = button;
+  s_button_held = true;
+  if (s_button_press_timer) app_timer_cancel(s_button_press_timer);
+  s_button_press_timer = app_timer_register(55, button_press_tick, NULL);
+}
+
+static void button_raw_up(ClickRecognizerRef recognizer, void *context) {
+  ButtonId id = click_recognizer_get_button_id(recognizer);
+  int button = id == BUTTON_ID_SELECT ? 0 : id == BUTTON_ID_DOWN ? 1 : -1;
+  if (button < 0 || button != s_button_active) return;
+  s_button_held = false;
+  if (s_button_press_timer) app_timer_cancel(s_button_press_timer);
+  s_button_press_timer = app_timer_register(55, button_press_tick, NULL);
 }
 
 static void click_config(void *context) {
-  window_single_click_subscribe(BUTTON_ID_SELECT, save_click);
-  window_single_click_subscribe(BUTTON_ID_DOWN, cancel_or_delete_click);
+  window_raw_click_subscribe(BUTTON_ID_SELECT, button_raw_down, button_raw_up, NULL);
+  window_raw_click_subscribe(BUTTON_ID_DOWN, button_raw_down, button_raw_up, NULL);
 }
-
 
 static void on_appear(Window *window) {
   if (!s_button_intro_timer && !s_button_bounce_timer && s_button_bounce_x == 30)
@@ -316,6 +358,8 @@ static void on_unload(Window *window) {
   on_disappear(window);
   if (s_button_intro_timer) { app_timer_cancel(s_button_intro_timer); s_button_intro_timer = NULL; }
   if (s_button_bounce_timer) { app_timer_cancel(s_button_bounce_timer); s_button_bounce_timer = NULL; }
+  if (s_button_press_timer) { app_timer_cancel(s_button_press_timer); s_button_press_timer = NULL; }
+  s_button_active = -1;
   if (s_roll_timer) { app_timer_cancel(s_roll_timer); s_roll_timer = NULL; }
   if (s_fling_timer) { app_timer_cancel(s_fling_timer); s_fling_timer = NULL; }
   layer_destroy(s_canvas);
@@ -332,6 +376,9 @@ static void open_editor(int edit_offset) {
   s_touching = false;
   s_button_bounce_x = 30;
   s_button_bounce_frame = 0;
+  s_button_active = -1;
+  s_button_held = false;
+  s_button_width[0] = s_button_width[1] = 5;
   double initial = edit_offset >= 0
     ? get_history_weight(edit_offset) : get_latest_weight();
   if (initial <= 0) initial = 80.0;
