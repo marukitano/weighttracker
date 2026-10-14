@@ -32,6 +32,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "windows/wakeup.h"
 #include "main.h"
 
+#define WT_EXPORT_REQUEST_KEY 70
+#define WT_EXPORT_DATA_KEY 71
+#define WT_EXPORT_DONE_KEY 72
+
 static int s_today;
 
 static Window *s_window;
@@ -586,7 +590,7 @@ static void export_send_next(void) {
   if (app_message_outbox_begin(&out) != APP_MSG_OK || !out) return;
   int count = get_history_count();
   if (s_export_offset >= count) {
-    dict_write_uint8(out, MESSAGE_KEY_EXPORT_DONE, 1);
+    dict_write_uint8(out, WT_EXPORT_DONE_KEY, 1);
     if (app_message_outbox_send() == APP_MSG_OK) s_export_offset = -1;
     return;
   }
@@ -600,7 +604,7 @@ static void export_send_next(void) {
     used += n;
   }
   if (used == 0) { s_export_offset = -1; return; }
-  dict_write_cstring(out, MESSAGE_KEY_EXPORT_DATA, s_export_packet);
+  dict_write_cstring(out, WT_EXPORT_DATA_KEY, s_export_packet);
   if (app_message_outbox_send() == APP_MSG_OK) s_export_offset += 5;
 }
 static void export_outbox_sent(DictionaryIterator *sent, void *context) {
@@ -613,7 +617,7 @@ static void export_outbox_failed(DictionaryIterator *sent, AppMessageResult reas
 }
 
 static void config_received(DictionaryIterator *iter, void *context) {
-  if (dict_find(iter, MESSAGE_KEY_EXPORT_REQUEST)) {
+  if (dict_find(iter, WT_EXPORT_REQUEST_KEY)) {
     s_export_offset = 0;
     export_send_next();
     return;
