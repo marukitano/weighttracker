@@ -27,7 +27,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "support/pin.h"
 #include "support/parameters.h"
 #include "support/chart_prefs.h"
-#include "windows/details.h"
 #include "windows/input.h"
 #include "windows/welcome.h"
 #include "windows/wakeup.h"
@@ -441,7 +440,10 @@ static void button_anim_tick(void *context) {
     s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
   } else {
     s_active_button = -1;
-    if (i == 1) show_details();
+    if (i == 1) {
+      int history_index = get_chart_history_index(s_history_offset);
+      if (history_index >= 0) show_input_edit(history_index);
+    }
     else if (i == 2) show_input();
   }
 }
