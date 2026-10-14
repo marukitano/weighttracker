@@ -330,11 +330,6 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     // within the available width of one day without changing the day spacing.
     same_day_positions[i] = position_in_day < step ? position_in_day : step - 1;
     values[i] = to_current_unit(get_history_weight(newest_offset));
-    if (!found) { min_weight = max_weight = values[i]; found = true; }
-    else {
-      if (values[i] < min_weight) min_weight = values[i];
-      if (values[i] > max_weight) max_weight = values[i];
-    }
   }
   for (int i = 0; i < count; ++i) {
     int32_t displacement;
@@ -352,6 +347,18 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     }
     points[i].x = bounds.size.w / 2 + displacement;
   }
+
+  // Preserve a useful vertical scale for the current viewport instead of
+  // flattening nearby changes against distant historical outliers.
+  for (int i = 0; i < count; ++i) {
+    if (points[i].x < 0 || points[i].x >= bounds.size.w) continue;
+    if (!found) { min_weight = max_weight = values[i]; found = true; }
+    else {
+      if (values[i] < min_weight) min_weight = values[i];
+      if (values[i] > max_weight) max_weight = values[i];
+    }
+  }
+  if (!found) min_weight = max_weight = values[selected];
 
   double spread = max_weight - min_weight;
   double pad = spread > 0 ? spread * 0.2 : 1.0;
