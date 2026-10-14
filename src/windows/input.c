@@ -193,19 +193,19 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_stroke_width(ctx, major ? 2 : 1);
     graphics_draw_line(ctx, GPoint(ruler_x, y),
-                            GPoint(ruler_x + (major ? 32 : 18), y));
+                            GPoint(ruler_x + (major ? 16 : 9), y));
     if (major && step != 0) {
       char tick[16];
       snprintf(tick, sizeof(tick), "%d", value / 10);
       graphics_context_set_text_color(ctx, GColorBlack);
       graphics_draw_text(ctx, tick, fonts_get_system_font(FONT_KEY_GOTHIC_14),
-        GRect(ruler_x + 34, y - 10, 30, 22), GTextOverflowModeTrailingEllipsis,
+        GRect(ruler_x + 17, y - 10, 20, 22), GTextOverflowModeTrailingEllipsis,
         GTextAlignmentLeft, NULL);
     }
   }
   graphics_context_set_stroke_color(ctx, GColorRed);
   graphics_context_set_stroke_width(ctx, 3);
-  graphics_draw_line(ctx, GPoint(ruler_x, readout_y), GPoint(ruler_x + 64, readout_y));
+  graphics_draw_line(ctx, GPoint(ruler_x, readout_y), GPoint(ruler_x + 32, readout_y));
   // Swiss Chronograph-style number bubble: a hollow red oval swells
   // around a major tick label as that label approaches the readout line.
   int nearest_value = -1;
@@ -238,7 +238,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     int oval_w = 1 + (target_w - 1) * progress / 100;
     int oval_h = 1 + 19 * progress / 100;
     if (oval_h >= 2 && oval_w >= 2) {
-      int bubble_cx = 34 + text_size.w / 2;
+      int bubble_cx = 17 + text_size.w / 2;
       GRect bubble = GRect(bubble_cx - oval_w / 2,
                            readout_y - oval_h / 2, oval_w, oval_h);
       graphics_context_set_fill_color(ctx, GColorWhite);
@@ -248,7 +248,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
       graphics_draw_round_rect(ctx, bubble, oval_h / 2);
       graphics_context_set_text_color(ctx, GColorBlack);
       graphics_draw_text(ctx, label, font,
-        GRect(34, nearest_y - 10, 64, 22),
+        GRect(17, nearest_y - 10, 42, 22),
         GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
     }
   }
