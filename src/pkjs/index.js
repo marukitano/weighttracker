@@ -112,7 +112,7 @@ Pebble.addEventListener('showConfiguration', function() {
     exporting = false;
     openSettings();
   }, 5000);
-  Pebble.sendAppMessage({EXPORT_REQUEST: 1}, function() {}, function() {
+  Pebble.sendAppMessage((function() { var p = {}; p[require('message_keys').EXPORT_REQUEST] = 1; return p; })(), function() {}, function() {
     exporting = false;
     if (exportTimer) clearTimeout(exportTimer);
     openSettings();
