@@ -441,8 +441,7 @@ static void button_anim_tick(void *context) {
     s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
   } else {
     s_active_button = -1;
-    if (i == 0) change_history(-1);
-    else if (i == 1) show_details();
+    if (i == 1) show_details();
   }
 }
 
@@ -453,6 +452,8 @@ static void button_raw_down(ClickRecognizerRef recognizer, void *context) {
   if (s_button_enter_x[i] != 0 || s_button_entering[i]) return;
   s_active_button = i;
   s_button_held = true;
+  // Navigate immediately on UP press; do not wait for release animation.
+  if (i == 0) change_history(-1);
   if (s_button_anim_timer) app_timer_cancel(s_button_anim_timer);
   s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
 }
