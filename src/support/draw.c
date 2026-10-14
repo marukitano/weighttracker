@@ -31,19 +31,9 @@ void set_chart_pulse_step(uint8_t step) {
   s_pulse_step = step % 40;
 }
 
-// Browse only real, saved measurements in reverse chronological order.
-// Browse the measurements visible in the selected chart mode.
+// The chart range controls zoom (spacing), never the accessible history.
 static int visible_offset(int offset) {
-  if (get_chart_mode() == 0) return offset;
-  int seen = 0;
-  uint32_t today = get_current_date();
-  for (int i = 0; i < get_history_count(); ++i) {
-    uint32_t date = get_history_date(i);
-    long age = days(date, today);
-    if (age < 0 || age > get_chart_range()) continue;
-    if (seen++ == offset) return i;
-  }
-  return -1;
+  return offset >= 0 && offset < get_history_count() ? offset : -1;
 }
 int get_chart_history_index(int offset) {
   return visible_offset(offset);
@@ -53,16 +43,7 @@ double get_chart_history_weight(int offset) {
   return i < 0 ? -1 : get_history_weight(i);
 }
 int get_chart_history_count(void) {
-  if (get_chart_mode() == 0) {
-    int count = get_history_count();
-    return count < get_chart_range() + 1 ? count : get_chart_range() + 1;
-  }
-  int count = 0;
-  for (int i = 0; i < get_history_count(); ++i) {
-    long age = days(get_history_date(i), get_current_date());
-    if (age >= 0 && age <= get_chart_range()) ++count;
-  }
-  return count;
+  return get_history_count();
 }
 double get_chart_display_weight(void) {
   return get_latest_weight();
@@ -321,65 +302,53 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   s_color_scale_ready = false;
   if (width < 1 || height < 1) return;
 
-  GPoint points[32];
-  bool measured[32] = {false};
-  int count = 0;
-  int selected = 0;
-  double values[32];
-  double min_weight = 0, max_weight = 0;
-  bool found = false;
+  // Keep all archived readings (up to HISTORY_CAPACITY), regardless of zoom.
+  // The selected reading is always drawn at the screen center.
+  int count = get_history_count();
+  if (count < 1) return;
+  if (count > HISTORY_CAPACITY) count = HISTORY_CAPACITY;
+  GPoint points[HISTORY_CAPACITY];
+  double values[HISTORY_CAPACITY];
+  int selected = count - 1 - s_selected_history_offset;
+  if (selected < 0) selected = 0;
+  if (selected >= count) selected = count - 1;
+  uint32_t selected_date = get_history_date(count - 1 - selected);
+  const int step = (width / (2 * range)) > 0 ? width / (2 * range) : 1;
+  int same_day_positions[HISTORY_CAPACITY];
+  uint32_t last_date = 0;
+  int position_in_day = 0;
 
-  if (!by_days) {
-    // Evenly spaced measurements, independent of gaps in calendar time.
-    int available = get_history_count();
-    int take = available < range + 1 ? available : range + 1;
-    if (take < 1) return;
-    // When there are fewer than 2 readings, extend the flat curve edge to edge.
-    count = take < 2 ? 2 : take;
-    for (int i = 0; i < count; ++i) {
-      int newest_offset = take == 1 ? 0 : take - 1 - i;
-      values[i] = to_current_unit(get_history_weight(newest_offset));
-      measured[i] = true;
-      if (!found) { min_weight = max_weight = values[i]; found = true; }
-      else {
-        if (values[i] < min_weight) min_weight = values[i];
-        if (values[i] > max_weight) max_weight = values[i];
-      }
+  for (int i = 0; i < count; ++i) {
+    int newest_offset = count - 1 - i;
+    uint32_t date = get_history_date(newest_offset);
+    if (i > 0 && date == last_date) ++position_in_day;
+    else position_in_day = 0;
+    last_date = date;
+    // For calendar days, distinguish successive readings from the same day
+    // within the available width of one day without changing the day spacing.
+    same_day_positions[i] = position_in_day < step ? position_in_day : step - 1;
+    values[i] = to_current_unit(get_history_weight(newest_offset));
+    if (!found) { min_weight = max_weight = values[i]; found = true; }
+    else {
+      if (values[i] < min_weight) min_weight = values[i];
+      if (values[i] > max_weight) max_weight = values[i];
     }
-    selected = take == 1 ? count - 1 : take - 1 - s_selected_history_offset;
-    if (selected < 0) selected = 0;
-    if (selected >= count) selected = count - 1;
-  } else {
-    // Calendar mode preserves true horizontal date spacing.
-    // Include the currently selected day plus the requested days to its left.
-    count = range + 1;
-    uint32_t today = get_current_date();
-    int first_known = -1;
-    for (int i = 0; i < count; ++i) {
-      int age = count - 1 - i;
-      for (int j = 0; j < get_history_count(); ++j) {
-        if (days(get_history_date(j), today) != age) continue;
-        values[i] = to_current_unit(get_history_weight(j));
-        measured[i] = true;
-        if (first_known < 0) first_known = i;
-        if (!found) { min_weight = max_weight = values[i]; found = true; }
-        else {
-          if (values[i] < min_weight) min_weight = values[i];
-          if (values[i] > max_weight) max_weight = values[i];
-        }
-        break;
-      }
+  }
+  for (int i = 0; i < count; ++i) {
+    int32_t displacement;
+    if (by_days) {
+      uint32_t date = get_history_date(count - 1 - i);
+      long day_delta = days(selected_date, date);
+      // Dates can span years; avoid overflowing GPoint's 16-bit coordinate.
+      long raw = day_delta * step +
+                 same_day_positions[i] - same_day_positions[selected];
+      if (raw < -30000) raw = -30000;
+      if (raw > 30000) raw = 30000;
+      displacement = (int32_t)raw;
+    } else {
+      displacement = (i - selected) * step;
     }
-    if (first_known < 0) return;
-    for (int i = 0; i < first_known; ++i) values[i] = values[first_known];
-    for (int i = first_known + 1; i < count; ++i)
-      if (!measured[i]) values[i] = values[i - 1];
-    selected = first_known;
-    int seen = 0;
-    for (int i = count - 1; i >= 0; --i) {
-      if (!measured[i]) continue;
-      if (seen++ == s_selected_history_offset) { selected = i; break; }
-    }
+    points[i].x = bounds.size.w / 2 + displacement;
   }
 
   double spread = max_weight - min_weight;
@@ -392,17 +361,8 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   s_color_height = height;
   s_color_scale_ready = true;
   for (int i = 0; i < count; ++i) {
-    // The setting counts steps to the LEFT of the selected marker, not
-    // the entire screen width (the selector itself is centered).
-    int step = by_days ? width / (2 * range) : width / (2 * range);
-    if (step < 1) step = 1;
-    int x = left + step * i;
-    points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
+    points[i].y = chart_y(values[i], min_weight, max_weight, top, height);
   }
-
-  // Scroll the entire plot under the fixed center selector.
-  int scroll_x = bounds.size.w / 2 - points[selected].x;
-  for (int i = 0; i < count; ++i) points[i].x += scroll_x;
 
   // White canvas, no area fill. Only the smoothed weight line is drawn
   // within the middle third of the display.
