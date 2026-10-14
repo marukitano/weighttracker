@@ -1,6 +1,6 @@
 {
   "name": "weighttracker-pebble-time-2",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "WeightTracker for Pebble watches, including Pebble Time 2",
   "author": "Viktor Csala; Pebble Time 2 adaptation by marukitano",
   "license": "GPL-3.0-or-later",
