@@ -190,13 +190,13 @@ static void draw_pixel_weight(GContext *ctx, const char *value, int width) {
 // Pixel-art trash can. Every drawn pixel changes from red to white as
 // the expanding red delete tab reaches its column.
 static void draw_trash_icon(GContext *ctx, int x, int y, int red_edge) {
-  static const uint16_t rows[17] = {
-    0x0070, 0x0070, 0x03FC, 0x03FC,
-    0x0FFE, 0x0FFE, 0x07FC, 0x07FC,
-    0x066C, 0x066C, 0x066C, 0x066C,
-    0x066C, 0x066C, 0x07FC, 0x07FC, 0x03F8
+  // 12-pixel-wide mirrored bitmap: balanced lid, handle and bin walls.
+  static const uint16_t rows[15] = {
+    0x0F0, 0x0F0, 0x3FC, 0x7FE, 0x7FE,
+    0x204, 0x294, 0x294, 0x294, 0x294,
+    0x294, 0x294, 0x294, 0x3FC, 0x3FC
   };
-  for (int row = 0; row < 17; ++row) {
+  for (int row = 0; row < 15; ++row) {
     for (int col = 0; col < 12; ++col) {
       if (!(rows[row] & (1 << (11 - col)))) continue;
       int px = x + col;
