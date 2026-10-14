@@ -155,6 +155,44 @@ bool update_history_weight(int newest_offset, double weight) {
   return true;
 }
 
+// Remove exactly one measurement from the archive, preserving date order.
+bool delete_history_weight(int newest_offset) {
+  int index = s_history_count - 1 - newest_offset;
+  if (index < 0 || index >= s_history_count) return false;
+  uint32_t deleted_date = s_history[index].date;
+  int32_t deleted_weight = s_history[index].weight_10000;
+  for (int j = index; j + 1 < s_history_count; ++j)
+    s_history[j] = s_history[j + 1];
+  --s_history_count;
+
+  // Keep legacy daily cache from displaying a deleted measurement.
+  double replacement = -1.0;
+  for (int j = s_history_count - 1; j >= 0; --j) {
+    if (s_history[j].date == deleted_date) {
+      replacement = (double)s_history[j].weight_10000 / 10000.0;
+      break;
+    }
+    if (s_history[j].date < deleted_date) break;
+  }
+  for (int j = 0; j < NUM_OF_DAYS; ++j) {
+    if (data[j].measured && data[j].date == deleted_date &&
+        (int32_t)(data[j].weight * 10000.0 + 0.5) == deleted_weight) {
+      if (replacement > 0) data[j].weight = replacement;
+      else { data[j].measured = 0; data[j].weight = -1.0; }
+    }
+  }
+  if (s_history_count > 0) {
+    s_current_date = s_history[s_history_count - 1].date;
+    s_current_weight = (double)s_history[s_history_count - 1].weight_10000 / 10000.0;
+  } else {
+    s_current_date = 0;
+    s_current_weight = -1.0;
+    s_used_already = 0;
+  }
+  history_save();
+  return true;
+}
+
 int32_t get_current_pin_id(PinType pt) {
   if (pt == MEASUREMENT) {
     return s_measurement_pin_id;
