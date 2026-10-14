@@ -125,6 +125,39 @@ static void on_touch(const TouchEvent *event, void *context) {
 }
 #endif
 
+// Same custom 5x7 pixel glyphs as the rotated chart labels.
+static const uint8_t s_weight_glyphs[11][7] = {
+  {14,17,19,21,25,17,14}, {4,12,4,4,4,4,14},
+  {14,17,1,2,4,8,31}, {30,1,1,14,1,1,30},
+  {2,6,10,18,31,2,2}, {31,16,16,30,1,1,30},
+  {14,16,16,30,17,17,14}, {31,1,2,4,8,8,8},
+  {14,17,17,14,17,17,14}, {14,17,17,15,1,1,14},
+  {0,0,0,0,0,12,12}
+};
+
+static void draw_pixel_weight(GContext *ctx, const char *value, int width) {
+  const int scale = 4;
+  int count = 0, pixels = 0;
+  while (value[count] && count < 20) {
+    pixels += value[count] == '.' ? 4 : 6;
+    ++count;
+  }
+  int x = (width - pixels * scale) / 2;
+  const int y = 9;
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  for (int c = 0; c < count; ++c) {
+    int glyph = value[c] == '.' ? 10 : value[c] - '0';
+    if (glyph < 0 || glyph > 10) continue;
+    for (int row = 0; row < 7; ++row)
+      for (int col = 0; col < 5; ++col)
+        if (s_weight_glyphs[glyph][row] & (1 << (4 - col)))
+          graphics_fill_rect(ctx,
+            GRect(x + col * scale, y + row * scale, scale, scale),
+            0, GCornerNone);
+    x += (value[c] == '.' ? 4 : 6) * scale;
+  }
+}
+
 static void draw_canvas(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int ruler_x = 0;
@@ -221,10 +254,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   }
   char weight[24];
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
-  graphics_context_set_text_color(ctx, GColorBlack);
-  graphics_draw_text(ctx, weight, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK),
-    GRect(0, 8, bounds.size.w, 43),
-    GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  draw_pixel_weight(ctx, weight, bounds.size.w);
 
   // Left delete marker appears only when editing.
   if (s_edit_offset >= 0) {
