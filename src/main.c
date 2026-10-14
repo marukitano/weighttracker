@@ -577,7 +577,47 @@ static void hide_main(void) {
   window_stack_remove(s_window, true);
 }
 
+// Stream archived readings to PebbleKit JS in small acknowledged packets.
+static int s_export_offset = -1;
+static char s_export_packet[180];
+static void export_send_next(void) {
+  if (s_export_offset < 0) return;
+  DictionaryIterator *out = NULL;
+  if (app_message_outbox_begin(&out) != APP_MSG_OK || !out) return;
+  int count = get_history_count();
+  if (s_export_offset >= count) {
+    dict_write_uint8(out, MESSAGE_KEY_EXPORT_DONE, 1);
+    if (app_message_outbox_send() == APP_MSG_OK) s_export_offset = -1;
+    return;
+  }
+  int used = 0;
+  for (int i = s_export_offset; i < count && i < s_export_offset + 5; ++i) {
+    uint32_t date = get_history_date(count - 1 - i);
+    int32_t weight = (int32_t)(get_history_weight(count - 1 - i) * 10000.0 + 0.5);
+    int n = snprintf(s_export_packet + used, sizeof(s_export_packet) - used,
+      "%lu,%ld;", (unsigned long)date, (long)weight);
+    if (n <= 0 || n >= (int)(sizeof(s_export_packet) - used)) break;
+    used += n;
+  }
+  if (used == 0) { s_export_offset = -1; return; }
+  dict_write_cstring(out, MESSAGE_KEY_EXPORT_DATA, s_export_packet);
+  if (app_message_outbox_send() == APP_MSG_OK) s_export_offset += 5;
+}
+static void export_outbox_sent(DictionaryIterator *sent, void *context) {
+  export_send_next();
+}
+static void export_outbox_failed(DictionaryIterator *sent, AppMessageResult reason,
+                                 void *context) {
+  // Do not silently skip records after a failed packet.
+  s_export_offset = -1;
+}
+
 static void config_received(DictionaryIterator *iter, void *context) {
+  if (dict_find(iter, MESSAGE_KEY_EXPORT_REQUEST)) {
+    s_export_offset = 0;
+    export_send_next();
+    return;
+  }
   if (!chart_prefs_apply(iter)) return;
   s_history_offset = 0;
   s_incoming_offset = 0;
@@ -599,6 +639,8 @@ void init() {
   load_data();
   chart_prefs_load();
   app_message_register_inbox_received(config_received);
+  app_message_register_outbox_sent(export_outbox_sent);
+  app_message_register_outbox_failed(export_outbox_failed);
   app_message_open(256, 64);
   wakeup_service_subscribe(wakeup_handler);
 }
