@@ -9,8 +9,8 @@
 #define KEY_MODE 62
 #define KEY_RANGE 63
 #define KEY_UNIT 64
-#define KEY_ABOVE MESSAGE_KEY_LABEL_ABOVE
-#define KEY_BELOW MESSAGE_KEY_LABEL_BELOW
+#define KEY_ABOVE 73
+#define KEY_BELOW 74
 #define MIN_RANGE 2
 #define MAX_RANGE 30
 
