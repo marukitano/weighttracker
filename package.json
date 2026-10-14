@@ -14,7 +14,7 @@
   },
   "pebble": {
     "displayName": "WeightTracker",
-    "uuid": "7151ed69-3204-4914-8aaa-860e1494a504",
+    "uuid": "7841b128-43c1-4f14-8303-89faf5e0a1a4",
     "sdkVersion": "3",
     "targetPlatforms": [
       "emery"
