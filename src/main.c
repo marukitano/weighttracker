@@ -28,7 +28,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "support/parameters.h"
 #include "support/chart_prefs.h"
 #include "windows/input.h"
-#include "windows/welcome.h"
 #include "windows/wakeup.h"
 #include "main.h"
 
@@ -647,11 +646,6 @@ int main(void) {
 
   if (launch_reason() == APP_LAUNCH_WAKEUP) {
     show_wakeup();
-#ifndef PBL_PLATFORM_APLITE
-    do_anim = false;
-#endif
-  } else if (get_stored_version() != get_current_version()) {
-    show_welcome();
 #ifndef PBL_PLATFORM_APLITE
     do_anim = false;
 #endif
