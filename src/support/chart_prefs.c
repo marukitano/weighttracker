@@ -9,8 +9,8 @@
 #define KEY_MODE 62
 #define KEY_RANGE 63
 #define KEY_UNIT 64
-#define KEY_ABOVE 73
-#define KEY_BELOW 74
+#define KEY_ABOVE MESSAGE_KEY_LABEL_ABOVE
+#define KEY_BELOW MESSAGE_KEY_LABEL_BELOW
 #define MIN_RANGE 2
 #define MAX_RANGE 30
 
@@ -64,6 +64,7 @@ bool chart_prefs_apply(DictionaryIterator *iter) {
     }
   }
   if ((t = dict_find(iter, KEY_ABOVE))) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Chart label above received: type=%d value=%d", t->type, as_int(t));
     int value = as_int(t);
     if (value >= 0 && value <= 2) {
       s_label_above = value;
@@ -72,6 +73,7 @@ bool chart_prefs_apply(DictionaryIterator *iter) {
     }
   }
   if ((t = dict_find(iter, KEY_BELOW))) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Chart label below received: type=%d value=%d", t->type, as_int(t));
     int value = as_int(t);
     if (value >= 0 && value <= 2) {
       s_label_below = value;
