@@ -181,7 +181,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, weight, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK),
-    GRect(76, cy - 21, bounds.size.w - 85, 43),
+    GRect(0, 48, bounds.size.w, 43),
     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
   graphics_draw_text(ctx, get_short_unit_name(),
     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
