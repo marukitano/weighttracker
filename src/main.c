@@ -106,7 +106,7 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
-    if (s_button_enter_x[i] >= 30) continue;
+    if (i == 2 || s_button_enter_x[i] >= 30) continue;
     int shift = s_button_enter_x[i];
     // Swiss Chronograph: stretch the tab back to the physical edge.
     int marker_width = s_button_width[i] + (shift > 0 ? shift : 0);
@@ -123,10 +123,10 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(icon_left, center_y[i] + 4),
                          GPoint(icon_right - 5, center_y[i] + 4));
     } else {
-      // Upper key: left chevron; lower key: right chevron.
+      // Upper key: right chevron (newer measurement).
       const int mid_x = (icon_left + icon_right) / 2;
-      const int tip_x = mid_x + (i == 0 ? -4 : 4);
-      const int arm_x = mid_x + (i == 0 ? 3 : -3);
+      const int tip_x = mid_x + 4;
+      const int arm_x = mid_x - 3;
       graphics_draw_line(ctx, GPoint(arm_x, center_y[i] - 6),
                          GPoint(tip_x, center_y[i]));
       graphics_draw_line(ctx, GPoint(tip_x, center_y[i]),
@@ -146,8 +146,8 @@ static void back_marker_update(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
   int cx = 15 - shift, cy = 36;
-  graphics_draw_line(ctx, GPoint(cx - 5, cy - 5), GPoint(cx + 5, cy + 5));
-  graphics_draw_line(ctx, GPoint(cx - 5, cy + 5), GPoint(cx + 5, cy - 5));
+  graphics_draw_line(ctx, GPoint(cx + 4, cy - 6), GPoint(cx - 3, cy));
+  graphics_draw_line(ctx, GPoint(cx - 3, cy), GPoint(cx + 4, cy + 6));
 }
 
 // Two independent weight captions slide through a clipped display window.
@@ -409,9 +409,8 @@ static void button_anim_tick(void *context) {
     s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
   } else {
     s_active_button = -1;
-    if (i == 0) change_history(1);
+    if (i == 0) change_history(-1);
     else if (i == 1) show_details();
-    else change_history(-1);
   }
 }
 
@@ -433,10 +432,15 @@ static void button_raw_up(ClickRecognizerRef recognizer, void *context) {
   s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
 }
 
+static void back_left_click(ClickRecognizerRef recognizer, void *context) {
+  change_history(1);
+}
+
 static void click_config_provider(void *context) {
   window_raw_click_subscribe(BUTTON_ID_UP, button_raw_down, button_raw_up, NULL);
   window_raw_click_subscribe(BUTTON_ID_SELECT, button_raw_down, button_raw_up, NULL);
-  window_raw_click_subscribe(BUTTON_ID_DOWN, button_raw_down, button_raw_up, NULL);
+  window_single_click_subscribe(BUTTON_ID_BACK, back_left_click);
+
 }
 
 #ifndef PBL_PLATFORM_APLITE
