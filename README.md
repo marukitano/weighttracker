@@ -52,8 +52,8 @@ The default chart labels are **weight above** and **date below**. BMI is a scree
 You need a Pebble SDK with **Pebble Time 2 / `emery`** support.
 
 ```bash
-git clone git@github.com:marukitano/weighttracker-Pebble-time-2.git
-cd weighttracker-Pebble-time-2
+git clone git@github.com:marukitano/weighttracker.git
+cd weighttracker
 pebble build
 pebble install --phone PHONE_IP_ADDRESS
 ```
@@ -123,8 +123,8 @@ Standardmässig steht **das Gewicht oben** und **das Datum unten**. Der BMI ist 
 Benötigt wird ein Pebble-SDK mit Unterstützung für die **Pebble Time 2 / `emery`**.
 
 ```bash
-git clone git@github.com:marukitano/weighttracker-Pebble-time-2.git
-cd weighttracker-Pebble-time-2
+git clone git@github.com:marukitano/weighttracker.git
+cd weighttracker
 pebble build
 pebble install --phone PHONE_IP_ADDRESS
 ```
