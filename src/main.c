@@ -40,6 +40,7 @@ static Layer *s_chart;
 static Layer *s_button_marker;
 static Layer *s_back_marker;
 static AppTimer *s_back_expand_timer;
+static AppTimer *s_back_press_timer;
 static bool s_back_expanded = false;
 static uint8_t s_back_width = 5;
 static AppTimer *s_button_anim_timer;
@@ -391,6 +392,7 @@ static void destroy_ui(void) {
     s_button_anim_timer = NULL;
   }
   layer_destroy(s_button_marker);
+  if (s_back_press_timer) { app_timer_cancel(s_back_press_timer); s_back_press_timer = NULL; }
   if (s_back_expand_timer) { app_timer_cancel(s_back_expand_timer); s_back_expand_timer = NULL; }
   layer_destroy(s_back_marker);
   s_back_marker = NULL;
@@ -470,7 +472,20 @@ static void button_raw_up(ClickRecognizerRef recognizer, void *context) {
   s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
 }
 
+static void back_press_tick(void *context) {
+  s_back_press_timer = NULL;
+  if (s_back_width > 5) --s_back_width;
+  if (s_back_marker) layer_mark_dirty(s_back_marker);
+  if (s_back_width > 5)
+    s_back_press_timer = app_timer_register(55, back_press_tick, NULL);
+}
+
 static void back_left_click(ClickRecognizerRef recognizer, void *context) {
+  // Pebble reserves long BACK presses; animate its short-click action.
+  if (s_back_press_timer) app_timer_cancel(s_back_press_timer);
+  s_back_width = 7;
+  if (s_back_marker) layer_mark_dirty(s_back_marker);
+  s_back_press_timer = app_timer_register(55, back_press_tick, NULL);
   change_history(1);
 }
 
