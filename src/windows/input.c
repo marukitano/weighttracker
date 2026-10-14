@@ -17,7 +17,6 @@ static int s_tenths;
 static int s_drag_pixels;
 static bool s_touching;
 static int s_last_y;
-static bool s_confirm_delete;
 static bool s_touch_registered;
 static AppTimer *s_roll_timer;
 static int s_roll_offset;
@@ -33,6 +32,9 @@ static AppTimer *s_button_press_timer;
 static int8_t s_button_active = -1; // 0=Select, 1=Down
 static bool s_button_held;
 static uint8_t s_button_width[2] = {5, 5};
+static uint8_t s_delete_frames = 0;
+#define DELETE_HOLD_FRAMES 60
+#define DELETE_MAX_WIDTH 34
 
 static int clamp_value(int value) {
   if (value < VALUE_MIN) return VALUE_MIN;
@@ -118,7 +120,6 @@ static void fling_tick(void *context) {
 
 #if PBL_TOUCH
 static void on_touch(const TouchEvent *event, void *context) {
-  if (s_confirm_delete) return;
   switch (event->type) {
     case TouchEvent_Touchdown:
       if (s_fling_timer) { app_timer_cancel(s_fling_timer); s_fling_timer = NULL; }
@@ -195,22 +196,6 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_text_color(ctx, GColorBlack);
 
-  if (s_confirm_delete) {
-    graphics_context_set_fill_color(ctx, GColorRed);
-    graphics_fill_rect(ctx, GRect(9, cy - 45, bounds.size.w - 18, 90),
-                       8, GCornersAll);
-    graphics_context_set_text_color(ctx, GColorWhite);
-    graphics_draw_text(ctx, "Delete reading?",
-       fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-       GRect(10, cy - 38, bounds.size.w - 20, 34),
-       GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-    graphics_draw_text(ctx, "Down: delete | Select: cancel",
-       fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
-       GRect(10, cy + 4, bounds.size.w - 20, 30),
-       GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
-    return;
-  }
-
   // The marker stays still while the ruler ticks roll beneath it.
   for (int step = -22; step <= 22; ++step) {
     int value = s_tenths + step;
@@ -241,62 +226,80 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     const int bottom_y = bounds.size.h - 36;
     const int middle_width = s_button_width[0] + (shift > 0 ? shift : 0);
     const int bottom_width = s_button_width[1] + (shift > 0 ? shift : 0);
-    graphics_context_set_fill_color(ctx, GColorBlack);
-    graphics_fill_rect(ctx,
-      GRect(edge_x - middle_width, center_y - 26, middle_width, 52),
-      5, GCornersLeft);
-    graphics_context_set_stroke_color(ctx, GColorBlack);
-    graphics_context_set_stroke_width(ctx, 2);
-    graphics_draw_line(ctx, GPoint(edge_x - 23 + shift, center_y),
-                       GPoint(edge_x - 18 + shift, center_y + 5));
-    graphics_draw_line(ctx, GPoint(edge_x - 18 + shift, center_y + 5),
-                       GPoint(edge_x - 10 + shift, center_y - 6));
+    if (s_edit_offset >= 0) {
+      graphics_context_set_fill_color(ctx, GColorBlack);
+      graphics_fill_rect(ctx,
+        GRect(edge_x - middle_width, center_y - 26, middle_width, 52),
+        5, GCornersLeft);
+      graphics_context_set_stroke_color(ctx, GColorBlack);
+      graphics_context_set_stroke_width(ctx, 2);
+      graphics_draw_line(ctx, GPoint(edge_x - 23 + shift, center_y),
+                         GPoint(edge_x - 18 + shift, center_y + 5));
+      graphics_draw_line(ctx, GPoint(edge_x - 18 + shift, center_y + 5),
+                         GPoint(edge_x - 10 + shift, center_y - 6));
+    }
 
+    // New: bottom check/save. Edit: bottom red X, hold for 3 seconds.
     GColor action_color = s_edit_offset >= 0 ? GColorRed : GColorBlack;
     graphics_context_set_fill_color(ctx, action_color);
     graphics_fill_rect(ctx,
       GRect(edge_x - bottom_width, bottom_y - 26, bottom_width, 52),
       5, GCornersLeft);
     graphics_context_set_stroke_color(ctx, action_color);
-    graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y - 7),
-                       GPoint(edge_x - 12 + shift, bottom_y + 7));
-    graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y + 7),
-                       GPoint(edge_x - 12 + shift, bottom_y - 7));
+    graphics_context_set_stroke_width(ctx, 2);
+    if (s_edit_offset >= 0) {
+      graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y - 7),
+                         GPoint(edge_x - 12 + shift, bottom_y + 7));
+      graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y + 7),
+                         GPoint(edge_x - 12 + shift, bottom_y - 7));
+    } else {
+      graphics_draw_line(ctx, GPoint(edge_x - 23 + shift, bottom_y),
+                         GPoint(edge_x - 18 + shift, bottom_y + 5));
+      graphics_draw_line(ctx, GPoint(edge_x - 18 + shift, bottom_y + 5),
+                         GPoint(edge_x - 10 + shift, bottom_y - 6));
+    }
   }
 }
 
-static void perform_button_action(int button) {
-  if (button == 0) {
-    // Select: save, or dismiss the pending deletion prompt.
-    if (s_confirm_delete) {
-      s_confirm_delete = false;
-      refresh();
-      return;
-    }
-    double weight = (double)s_tenths / 10.0;
-    if (s_edit_offset >= 0)
-      update_history_weight(s_edit_offset, from_current_unit(weight));
-    else
-      set_current(from_current_unit(weight));
-    window_stack_pop(true);
-  } else {
-    // Down: cancel a new value, or require confirmation before deleting.
-    if (s_edit_offset < 0) {
-      window_stack_pop(true);
-    } else if (!s_confirm_delete) {
-      s_confirm_delete = true;
-      refresh();
-    } else {
-      delete_history_weight(s_edit_offset);
-      window_stack_pop(true);
-    }
-  }
+static void save_weight(void) {
+  double weight = (double)s_tenths / 10.0;
+  if (s_edit_offset >= 0)
+    update_history_weight(s_edit_offset, from_current_unit(weight));
+  else
+    set_current(from_current_unit(weight));
+  window_stack_pop(true);
 }
 
 static void button_press_tick(void *context) {
   s_button_press_timer = NULL;
   if (s_button_active < 0) return;
   int button = s_button_active;
+
+  if (s_edit_offset >= 0 && button == 1) {
+    // Releasing early cancels the delete. The growing red tab is the timer.
+    if (!s_button_held) {
+      s_button_width[1] = 5;
+      s_delete_frames = 0;
+      s_button_active = -1;
+      refresh();
+      return;
+    }
+    if (s_delete_frames < DELETE_HOLD_FRAMES) ++s_delete_frames;
+    s_button_width[1] = 5 +
+      (uint8_t)((DELETE_MAX_WIDTH - 5) * s_delete_frames / DELETE_HOLD_FRAMES);
+    refresh();
+    if (s_delete_frames >= DELETE_HOLD_FRAMES) {
+      s_button_active = -1;
+      vibes_short_pulse();
+      delete_history_weight(s_edit_offset);
+      window_stack_pop(true);
+    } else {
+      s_button_press_timer = app_timer_register(50, button_press_tick, NULL);
+    }
+    return;
+  }
+
+  // Same press/release pulse as the main screen's right-hand buttons.
   if (s_button_held) {
     if (s_button_width[button] < 7) ++s_button_width[button];
     refresh();
@@ -308,18 +311,23 @@ static void button_press_tick(void *context) {
     s_button_press_timer = app_timer_register(55, button_press_tick, NULL);
   } else {
     s_button_active = -1;
-    perform_button_action(button);
+    save_weight();
   }
 }
 
 static void button_raw_down(ClickRecognizerRef recognizer, void *context) {
   ButtonId id = click_recognizer_get_button_id(recognizer);
   int button = id == BUTTON_ID_SELECT ? 0 : id == BUTTON_ID_DOWN ? 1 : -1;
-  if (button < 0 || s_button_active >= 0 || s_button_bounce_x != 0) return;
+  // New has only the bottom save action.
+  if (button < 0 || (s_edit_offset < 0 && button == 0) ||
+      s_button_active >= 0 || s_button_bounce_x != 0) return;
   s_button_active = button;
   s_button_held = true;
+  s_delete_frames = 0;
   if (s_button_press_timer) app_timer_cancel(s_button_press_timer);
-  s_button_press_timer = app_timer_register(55, button_press_tick, NULL);
+  s_button_press_timer = app_timer_register(
+    (s_edit_offset >= 0 && button == 1) ? 50 : 55,
+    button_press_tick, NULL);
 }
 
 static void button_raw_up(ClickRecognizerRef recognizer, void *context) {
@@ -328,11 +336,14 @@ static void button_raw_up(ClickRecognizerRef recognizer, void *context) {
   if (button < 0 || button != s_button_active) return;
   s_button_held = false;
   if (s_button_press_timer) app_timer_cancel(s_button_press_timer);
-  s_button_press_timer = app_timer_register(55, button_press_tick, NULL);
+  s_button_press_timer = app_timer_register(
+    (s_edit_offset >= 0 && button == 1) ? 1 : 55,
+    button_press_tick, NULL);
 }
 
 static void click_config(void *context) {
-  window_raw_click_subscribe(BUTTON_ID_SELECT, button_raw_down, button_raw_up, NULL);
+  if (s_edit_offset >= 0)
+    window_raw_click_subscribe(BUTTON_ID_SELECT, button_raw_down, button_raw_up, NULL);
   window_raw_click_subscribe(BUTTON_ID_DOWN, button_raw_down, button_raw_up, NULL);
 }
 
@@ -370,7 +381,6 @@ static void on_unload(Window *window) {
 
 static void open_editor(int edit_offset) {
   s_edit_offset = edit_offset;
-  s_confirm_delete = false;
   s_drag_pixels = 0;
   s_roll_offset = 0;
   s_touching = false;
@@ -379,6 +389,7 @@ static void open_editor(int edit_offset) {
   s_button_active = -1;
   s_button_held = false;
   s_button_width[0] = s_button_width[1] = 5;
+  s_delete_frames = 0;
   double initial = edit_offset >= 0
     ? get_history_weight(edit_offset) : get_latest_weight();
   if (initial <= 0) initial = 80.0;
