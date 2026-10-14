@@ -122,7 +122,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   for (int step = -9; step <= 9; ++step) {
     int value = s_tenths + step;
     if (value <= 0) continue;
-    int y = cy + step * STEP_PX + s_roll_offset;
+    int y = cy - step * STEP_PX + s_roll_offset;
     if (y < 46 || y > bounds.size.h - 32) continue;
     bool major = value % 10 == 0;
     graphics_context_set_stroke_color(ctx, GColorBlack);
