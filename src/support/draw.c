@@ -390,11 +390,15 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   int segment = 0;
   int previous_y = points[0].y;
-  for (int x = points[0].x; x <= points[count - 1].x; ++x) {
+  // Extend the oldest measured value horizontally to the left display edge.
+  // The newest point remains the real right-hand end of the curve.
+  int last_x = points[count - 1].x;
+  if (last_x >= bounds.size.w) last_x = bounds.size.w - 1;
+  for (int x = 0; x <= last_x; ++x) {
     while (segment + 2 < count && x > points[segment + 1].x) ++segment;
-    int y = smooth_curve_y(points, count, segment, x);
-    if (x > points[0].x) {
-      // Split line at every vertical BMI color transition (when enabled).
+    int y = x <= points[0].x ? points[0].y
+                             : smooth_curve_y(points, count, segment, x);
+    if (x > 0) {
       graphics_context_set_stroke_color(ctx, GColorRed);
       graphics_context_set_stroke_width(ctx, 3);
       graphics_draw_line(ctx, GPoint(x - 1, previous_y), GPoint(x, y));
