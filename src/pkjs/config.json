@@ -76,30 +76,41 @@
       },
       {
         "type": "select",
-        "messageKey": "CHART_COLOR",
-        "label": "Chart color",
-        "description": "BMI bands: green for normal, yellow for under/overweight, red for obesity. Enter height first.",
-        "defaultValue": "0",
+        "messageKey": "LABEL_ABOVE",
+        "label": "Above measurement point",
+        "defaultValue": "1",
         "options": [
           {
-            "label": "BMI bands (automatic)",
+            "label": "Date",
             "value": "0"
           },
           {
-            "label": "Solid red",
+            "label": "Weight",
             "value": "1"
           },
           {
-            "label": "Solid green",
+            "label": "BMI",
             "value": "2"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "messageKey": "LABEL_BELOW",
+        "label": "Below measurement point",
+        "defaultValue": "0",
+        "options": [
+          {
+            "label": "Date",
+            "value": "0"
           },
           {
-            "label": "Solid blue",
-            "value": "3"
+            "label": "Weight",
+            "value": "1"
           },
           {
-            "label": "Solid yellow",
-            "value": "4"
+            "label": "BMI",
+            "value": "2"
           }
         ]
       }
