@@ -21,6 +21,9 @@ static bool s_confirm_delete;
 static bool s_touch_registered;
 static AppTimer *s_roll_timer;
 static int s_roll_offset;
+static AppTimer *s_fling_timer;
+static int32_t s_velocity_q8;
+static int32_t s_fling_fraction_q8;
 
 static int clamp_value(int value) {
   if (value < VALUE_MIN) return VALUE_MIN;
@@ -44,13 +47,45 @@ static void roll_tick(void *context) {
     s_roll_timer = app_timer_register(16, roll_tick, NULL);
 }
 
-static void shift_tenths(int delta) {
-  int next = clamp_value(s_tenths + delta);
-  if (next == s_tenths) return;
-  s_roll_offset += (next - s_tenths) * STEP_PX;
-  s_tenths = next;
-  if (!s_roll_timer) s_roll_timer = app_timer_register(16, roll_tick, NULL);
+static void apply_drag(int pixels) {
+  s_drag_pixels += pixels;
+  while (s_drag_pixels >= STEP_PX && s_tenths < VALUE_MAX) {
+    ++s_tenths;
+    s_drag_pixels -= STEP_PX;
+  }
+  while (s_drag_pixels <= -STEP_PX && s_tenths > VALUE_MIN) {
+    --s_tenths;
+    s_drag_pixels += STEP_PX;
+  }
+  if ((s_tenths == VALUE_MAX && s_drag_pixels > 0) ||
+      (s_tenths == VALUE_MIN && s_drag_pixels < 0))
+    s_drag_pixels = 0;
   refresh();
+}
+
+static void finish_drag(void) {
+  s_roll_offset = s_drag_pixels;
+  s_drag_pixels = 0;
+  if (s_roll_timer) { app_timer_cancel(s_roll_timer); s_roll_timer = NULL; }
+  if (s_roll_offset) s_roll_timer = app_timer_register(16, roll_tick, NULL);
+  refresh();
+}
+
+static void fling_tick(void *context) {
+  s_fling_timer = NULL;
+  s_fling_fraction_q8 += s_velocity_q8;
+  int movement = (int)(s_fling_fraction_q8 / 256);
+  s_fling_fraction_q8 -= movement * 256;
+  if (movement) apply_drag(movement);
+  s_velocity_q8 = s_velocity_q8 * 92 / 100;
+  if ((s_velocity_q8 > -128 && s_velocity_q8 < 128) ||
+      (s_tenths == VALUE_MIN && s_velocity_q8 < 0) ||
+      (s_tenths == VALUE_MAX && s_velocity_q8 > 0)) {
+    finish_drag();
+    return;
+  }
+  s_fling_timer = app_timer_register(28, fling_tick, NULL);
+  if (!s_fling_timer) finish_drag();
 }
 
 #if PBL_TOUCH
@@ -58,32 +93,32 @@ static void on_touch(const TouchEvent *event, void *context) {
   if (s_confirm_delete) return;
   switch (event->type) {
     case TouchEvent_Touchdown:
+      if (s_fling_timer) { app_timer_cancel(s_fling_timer); s_fling_timer = NULL; }
+      if (s_roll_timer) { app_timer_cancel(s_roll_timer); s_roll_timer = NULL; }
       s_touching = true;
       s_last_y = event->y;
-      s_drag_pixels = 0;
-      if (s_roll_timer) { app_timer_cancel(s_roll_timer); s_roll_timer = NULL; }
+      s_drag_pixels = s_roll_offset;
       s_roll_offset = 0;
+      s_velocity_q8 = 0;
       break;
     case TouchEvent_PositionUpdate:
       if (!s_touching) break;
       {
         int delta = event->y - s_last_y;
         s_last_y = event->y;
-        s_drag_pixels += delta;
-        // Up: smaller, down: larger.
-        while (s_drag_pixels >= STEP_PX) {
-          shift_tenths(1);
-          s_drag_pixels -= STEP_PX;
-        }
-        while (s_drag_pixels <= -STEP_PX) {
-          shift_tenths(-1);
-          s_drag_pixels += STEP_PX;
-        }
+        s_velocity_q8 = (s_velocity_q8 + delta * 256 * 3) / 4;
+        apply_drag(delta);
       }
       break;
     case TouchEvent_Liftoff:
       s_touching = false;
-      s_drag_pixels = 0;
+      if (s_velocity_q8 > 9216) s_velocity_q8 = 9216;
+      if (s_velocity_q8 < -9216) s_velocity_q8 = -9216;
+      s_fling_fraction_q8 = 0;
+      if (s_velocity_q8 > 1024 || s_velocity_q8 < -1024) {
+        s_fling_timer = app_timer_register(28, fling_tick, NULL);
+        if (!s_fling_timer) finish_drag();
+      } else finish_drag();
       break;
     default: break;
   }
@@ -93,6 +128,7 @@ static void on_touch(const TouchEvent *event, void *context) {
 static void draw_canvas(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   int cx = bounds.size.w / 2;
+  const int ruler_x = 0;
   int cy = bounds.size.h / 2;
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
@@ -122,31 +158,31 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   for (int step = -9; step <= 9; ++step) {
     int value = s_tenths + step;
     if (value <= 0) continue;
-    int y = cy - step * STEP_PX + s_roll_offset;
+    int y = cy - step * STEP_PX + (s_touching || s_fling_timer ? s_drag_pixels : s_roll_offset);
     if (y < 46 || y > bounds.size.h - 32) continue;
     bool major = value % 10 == 0;
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_stroke_width(ctx, major ? 2 : 1);
-    graphics_draw_line(ctx, GPoint(cx + 25, y),
-                            GPoint(cx + (major ? 65 : 45), y));
+    graphics_draw_line(ctx, GPoint(ruler_x, y),
+                            GPoint(ruler_x + (major ? 32 : 18), y));
     if (major && step != 0) {
       char tick[16];
       snprintf(tick, sizeof(tick), "%d", value / 10);
       graphics_context_set_text_color(ctx, GColorBlack);
       graphics_draw_text(ctx, tick, fonts_get_system_font(FONT_KEY_GOTHIC_14),
-        GRect(cx - 4, y - 10, 30, 22), GTextOverflowModeTrailingEllipsis,
-        GTextAlignmentRight, NULL);
+        GRect(ruler_x + 34, y - 10, 30, 22), GTextOverflowModeTrailingEllipsis,
+        GTextAlignmentLeft, NULL);
     }
   }
   graphics_context_set_stroke_color(ctx, GColorRed);
   graphics_context_set_stroke_width(ctx, 3);
-  graphics_draw_line(ctx, GPoint(cx + 15, cy), GPoint(cx + 69, cy));
+  graphics_draw_line(ctx, GPoint(ruler_x, cy), GPoint(ruler_x + 75, cy));
   char weight[24];
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, weight, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK),
-    GRect(0, cy - 21, cx + 14, 43),
-    GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
+    GRect(76, cy - 21, bounds.size.w - 85, 43),
+    GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
   graphics_draw_text(ctx, get_short_unit_name(),
     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
     GRect(0, bounds.size.h - 34, bounds.size.w, 25),
@@ -222,6 +258,7 @@ static void on_disappear(Window *window) {
 static void on_unload(Window *window) {
   on_disappear(window);
   if (s_roll_timer) { app_timer_cancel(s_roll_timer); s_roll_timer = NULL; }
+  if (s_fling_timer) { app_timer_cancel(s_fling_timer); s_fling_timer = NULL; }
   layer_destroy(s_canvas);
   window_destroy(s_window);
   s_canvas = NULL;
