@@ -128,21 +128,10 @@ Pebble.addEventListener('webviewclosed', function(event) {
     console.log('Unable to parse WeightTracker settings: ' + e);
     return;
   }
-  // Explicitly deliver the supported key/value pairs to Pebble. The Clay
-  // message-key mapping can vary between SDK-generated builds.
-  var keys = require('message_keys');
-  var result = {};
-  var names = ['UNIT', 'HEIGHT_CM', 'CHART_MODE', 'CHART_RANGE',
-               'LABEL_ABOVE', 'LABEL_BELOW'];
-  names.forEach(function(name) {
-    var id = keys[name];
-    var value = settings[id];
-    if (value === undefined) value = settings[name];
-    if (value === undefined) return;
-    result[id] = parseInt(value, 10);
-  });
-  console.log('Sending settings: ' + JSON.stringify(result));
-  Pebble.sendAppMessage(result, function() {
+  // Clay already converts the select and slider values to numeric AppMessage
+  // keys. Passing the result through avoids silently dropping settings.
+  console.log('Settings payload: ' + JSON.stringify(settings));
+  Pebble.sendAppMessage(settings, function() {
     console.log('WeightTracker settings delivered');
   }, function(error) {
     console.log('WeightTracker settings failed: ' + JSON.stringify(error));
