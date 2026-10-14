@@ -24,6 +24,11 @@ static int s_roll_offset;
 static AppTimer *s_fling_timer;
 static int32_t s_velocity_q8;
 static int32_t s_fling_fraction_q8;
+static AppTimer *s_button_intro_timer;
+static AppTimer *s_button_bounce_timer;
+static uint8_t s_button_bounce_frame;
+static int8_t s_button_bounce_x = 30;
+static const int8_t BUTTON_BOUNCE_X[] = {30, 18, 8, -3, 2, -1, 0};
 
 static int clamp_value(int value) {
   if (value < VALUE_MIN) return VALUE_MIN;
@@ -33,6 +38,25 @@ static int clamp_value(int value) {
 
 static void refresh(void) {
   if (s_canvas) layer_mark_dirty(s_canvas);
+}
+
+static void button_bounce_tick(void *context) {
+  s_button_bounce_timer = NULL;
+  if (s_button_bounce_frame + 1 < sizeof(BUTTON_BOUNCE_X)) {
+    ++s_button_bounce_frame;
+    s_button_bounce_x = BUTTON_BOUNCE_X[s_button_bounce_frame];
+    refresh();
+    if (s_button_bounce_frame + 1 < sizeof(BUTTON_BOUNCE_X))
+      s_button_bounce_timer = app_timer_register(42, button_bounce_tick, NULL);
+  }
+}
+
+static void button_intro_tick(void *context) {
+  s_button_intro_timer = NULL;
+  s_button_bounce_frame = 0;
+  s_button_bounce_x = BUTTON_BOUNCE_X[0];
+  refresh();
+  s_button_bounce_timer = app_timer_register(42, button_bounce_tick, NULL);
 }
 
 static void roll_tick(void *context) {
@@ -205,31 +229,35 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
   draw_pixel_weight(ctx, weight, bounds.size.w);
 
-  // Match the main screen's narrow 5x52 side tabs.
-  const int edge_x = bounds.size.w;
-  const int center_y = bounds.size.h / 2;
-  const int bottom_y = bounds.size.h - 36;
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(edge_x - 5, center_y - 26, 5, 52),
-                     5, GCornersLeft);
-  graphics_context_set_stroke_color(ctx, GColorBlack);
-  graphics_context_set_stroke_width(ctx, 2);
-  // Save: check mark next to the middle right button.
-  graphics_draw_line(ctx, GPoint(edge_x - 23, center_y),
-                     GPoint(edge_x - 18, center_y + 5));
-  graphics_draw_line(ctx, GPoint(edge_x - 18, center_y + 5),
-                     GPoint(edge_x - 10, center_y - 6));
+  // Main-screen-style spring entrance, 5x52 tabs on the right edge.
+  if (s_button_bounce_x < 30) {
+    const int shift = s_button_bounce_x;
+    const int edge_x = bounds.size.w;
+    const int center_y = bounds.size.h / 2;
+    const int bottom_y = bounds.size.h - 36;
+    const int marker_width = 5 + (shift > 0 ? shift : 0);
+    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_fill_rect(ctx,
+      GRect(edge_x - marker_width, center_y - 26, marker_width, 52),
+      5, GCornersLeft);
+    graphics_context_set_stroke_color(ctx, GColorBlack);
+    graphics_context_set_stroke_width(ctx, 2);
+    graphics_draw_line(ctx, GPoint(edge_x - 23 + shift, center_y),
+                       GPoint(edge_x - 18 + shift, center_y + 5));
+    graphics_draw_line(ctx, GPoint(edge_x - 18 + shift, center_y + 5),
+                       GPoint(edge_x - 10 + shift, center_y - 6));
 
-  // Cancel new entry (black) or delete edited entry (red).
-  GColor action_color = s_edit_offset >= 0 ? GColorRed : GColorBlack;
-  graphics_context_set_fill_color(ctx, action_color);
-  graphics_fill_rect(ctx, GRect(edge_x - 5, bottom_y - 26, 5, 52),
-                     5, GCornersLeft);
-  graphics_context_set_stroke_color(ctx, action_color);
-  graphics_draw_line(ctx, GPoint(edge_x - 24, bottom_y - 7),
-                     GPoint(edge_x - 12, bottom_y + 7));
-  graphics_draw_line(ctx, GPoint(edge_x - 24, bottom_y + 7),
-                     GPoint(edge_x - 12, bottom_y - 7));
+    GColor action_color = s_edit_offset >= 0 ? GColorRed : GColorBlack;
+    graphics_context_set_fill_color(ctx, action_color);
+    graphics_fill_rect(ctx,
+      GRect(edge_x - marker_width, bottom_y - 26, marker_width, 52),
+      5, GCornersLeft);
+    graphics_context_set_stroke_color(ctx, action_color);
+    graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y - 7),
+                       GPoint(edge_x - 12 + shift, bottom_y + 7));
+    graphics_draw_line(ctx, GPoint(edge_x - 24 + shift, bottom_y + 7),
+                       GPoint(edge_x - 12 + shift, bottom_y - 7));
+  }
 }
 
 static void save_click(ClickRecognizerRef recognizer, void *context) {
@@ -267,6 +295,8 @@ static void click_config(void *context) {
 
 
 static void on_appear(Window *window) {
+  if (!s_button_intro_timer && !s_button_bounce_timer && s_button_bounce_x == 30)
+    s_button_intro_timer = app_timer_register(500, button_intro_tick, NULL);
 #if PBL_TOUCH
   if (touch_service_is_enabled() && !s_touch_registered) {
     touch_service_subscribe(on_touch, NULL);
@@ -284,6 +314,8 @@ static void on_disappear(Window *window) {
 }
 static void on_unload(Window *window) {
   on_disappear(window);
+  if (s_button_intro_timer) { app_timer_cancel(s_button_intro_timer); s_button_intro_timer = NULL; }
+  if (s_button_bounce_timer) { app_timer_cancel(s_button_bounce_timer); s_button_bounce_timer = NULL; }
   if (s_roll_timer) { app_timer_cancel(s_roll_timer); s_roll_timer = NULL; }
   if (s_fling_timer) { app_timer_cancel(s_fling_timer); s_fling_timer = NULL; }
   layer_destroy(s_canvas);
@@ -298,6 +330,8 @@ static void open_editor(int edit_offset) {
   s_drag_pixels = 0;
   s_roll_offset = 0;
   s_touching = false;
+  s_button_bounce_x = 30;
+  s_button_bounce_frame = 0;
   double initial = edit_offset >= 0
     ? get_history_weight(edit_offset) : get_latest_weight();
   if (initial <= 0) initial = 80.0;
