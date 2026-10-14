@@ -127,8 +127,8 @@ static void on_touch(const TouchEvent *event, void *context) {
 
 static void draw_canvas(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  int cx = bounds.size.w / 2;
   const int ruler_x = 0;
+  const int readout_y = 29;  // Vertical center of the top weight readout.
   int cy = bounds.size.h / 2;
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
@@ -151,11 +151,11 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   }
 
   // The marker stays still while the ruler ticks roll beneath it.
-  for (int step = -9; step <= 9; ++step) {
+  for (int step = -22; step <= 22; ++step) {
     int value = s_tenths + step;
     if (value <= 0) continue;
-    int y = cy - step * STEP_PX + (s_touching || s_fling_timer ? s_drag_pixels : s_roll_offset);
-    if (y < 46 || y > bounds.size.h - 32) continue;
+    int y = readout_y - step * STEP_PX + (s_touching || s_fling_timer ? s_drag_pixels : s_roll_offset);
+    if (y < 0 || y >= bounds.size.h) continue;
     bool major = value % 10 == 0;
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_context_set_stroke_width(ctx, major ? 2 : 1);
@@ -172,7 +172,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   }
   graphics_context_set_stroke_color(ctx, GColorRed);
   graphics_context_set_stroke_width(ctx, 3);
-  graphics_draw_line(ctx, GPoint(ruler_x, cy), GPoint(ruler_x + 75, cy));
+  graphics_draw_line(ctx, GPoint(ruler_x, readout_y), GPoint(ruler_x + 64, readout_y));
   char weight[24];
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
   graphics_context_set_text_color(ctx, GColorBlack);
