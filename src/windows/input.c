@@ -54,7 +54,7 @@ static void shift_tenths(int delta) {
 }
 
 #if PBL_TOUCH
-static void on_touch(TouchEvent *event, void *context) {
+static void on_touch(const TouchEvent *event, void *context) {
   if (s_confirm_delete) return;
   switch (event->type) {
     case TouchEvent_Touchdown:
