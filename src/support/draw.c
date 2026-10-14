@@ -55,7 +55,7 @@ double get_chart_history_weight(int offset) {
 int get_chart_history_count(void) {
   if (get_chart_mode() == 0) {
     int count = get_history_count();
-    return count < get_chart_range() ? count : get_chart_range();
+    return count < get_chart_range() + 1 ? count : get_chart_range() + 1;
   }
   int count = 0;
   for (int i = 0; i < get_history_count(); ++i) {
@@ -332,7 +332,7 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   if (!by_days) {
     // Evenly spaced measurements, independent of gaps in calendar time.
     int available = get_history_count();
-    int take = available < range ? available : range;
+    int take = available < range + 1 ? available : range + 1;
     if (take < 1) return;
     // When there are fewer than 2 readings, extend the flat curve edge to edge.
     count = take < 2 ? 2 : take;
@@ -391,7 +391,11 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   s_color_height = height;
   s_color_scale_ready = true;
   for (int i = 0; i < count; ++i) {
-    int x = left + (int)((int32_t)width * i / (count - 1));
+    // The setting counts steps to the LEFT of the selected marker, not
+    // the entire screen width (the selector itself is centered).
+    int step = by_days ? width / (2 * range) : width / (2 * range);
+    if (step < 1) step = 1;
+    int x = left + step * i;
     points[i] = GPoint(x, chart_y(values[i], min_weight, max_weight, top, height));
   }
 
