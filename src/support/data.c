@@ -45,7 +45,7 @@ void set_chart_mode(int mode) {
   persist_write_int(CHART_MODE_KEY, s_chart_mode);
 }
 void set_chart_range(int count) {
-  if (count < 2 || count > 30) return;
+  if (count < 4 || count > 30) return;
   s_chart_range = count;
   persist_write_int(CHART_RANGE_KEY, s_chart_range);
 }
@@ -297,7 +297,8 @@ void load_data(void) {
   // Older installations used 15/30 calendar days; new default is 10 measurements.
   s_chart_range = persist_exists(CHART_MODE_KEY) && persist_exists(CHART_RANGE_KEY)
       ? persist_read_int(CHART_RANGE_KEY) : 10;
-  if (s_chart_range < 2 || s_chart_range > 30) s_chart_range = 10;
+  if (s_chart_range < 4) s_chart_range = 4;
+  if (s_chart_range > 30) s_chart_range = 30;
   history_load();
 
   if (persist_exists(REMINDER_FLAG_KEY)) {
