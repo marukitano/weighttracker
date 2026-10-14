@@ -34,7 +34,7 @@
         "type": "slider",
         "messageKey": "HEIGHT_CM",
         "label": "Height (cm)",
-        "description": "Set to 0 to disable BMI zones. BMI is a screening indicator, not a diagnosis.",
+        "description": "Enter your height to display BMI beside chart points. BMI is a screening indicator, not a diagnosis.",
         "defaultValue": 0,
         "min": 0,
         "max": 230,
