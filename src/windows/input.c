@@ -161,7 +161,7 @@ static void draw_pixel_weight(GContext *ctx, const char *value, int width) {
 static void draw_canvas(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int ruler_x = 0;
-  const int readout_y = 29;  // Vertical center of the top weight readout.
+  const int readout_y = 23;  // Center of 5x7 pixel digits at y=9, scale 4.
   int cy = bounds.size.h / 2;
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
@@ -189,69 +189,18 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     if (value <= 0) continue;
     int y = readout_y - step * STEP_PX + (s_touching || s_fling_timer ? s_drag_pixels : s_roll_offset);
     if (y < 0 || y >= bounds.size.h) continue;
-    bool major = value % 10 == 0;
+    // 0.1: short thin tick; 0.5: medium thick; 1.0: twice the 0.5 length.
+    bool whole = value % 10 == 0;
+    bool half = value % 5 == 0;
     graphics_context_set_stroke_color(ctx, GColorBlack);
-    graphics_context_set_stroke_width(ctx, major ? 2 : 1);
+    graphics_context_set_stroke_width(ctx, half ? 2 : 1);
     graphics_draw_line(ctx, GPoint(ruler_x, y),
-                            GPoint(ruler_x + (major ? 16 : 9), y));
-    if (major && step != 0) {
-      char tick[16];
-      snprintf(tick, sizeof(tick), "%d", value / 10);
-      graphics_context_set_text_color(ctx, GColorBlack);
-      graphics_draw_text(ctx, tick, fonts_get_system_font(FONT_KEY_GOTHIC_14),
-        GRect(ruler_x + 17, y - 10, 20, 22), GTextOverflowModeTrailingEllipsis,
-        GTextAlignmentLeft, NULL);
-    }
+                       GPoint(ruler_x + (whole ? 32 : half ? 16 : 9), y));
   }
   graphics_context_set_stroke_color(ctx, GColorRed);
   graphics_context_set_stroke_width(ctx, 3);
-  graphics_draw_line(ctx, GPoint(ruler_x, readout_y), GPoint(ruler_x + 32, readout_y));
-  // Swiss Chronograph-style number bubble: a hollow red oval swells
-  // around a major tick label as that label approaches the readout line.
-  int nearest_value = -1;
-  int nearest_y = 0;
-  int nearest_distance = STEP_PX;
-  int fine = (s_touching || s_fling_timer) ? s_drag_pixels : s_roll_offset;
-  for (int step = -12; step <= 12; ++step) {
-    int value = s_tenths + step;
-    if (value <= 0 || value % 10 != 0) continue;
-    int y = readout_y - step * STEP_PX + fine;
-    int distance = y - readout_y;
-    if (distance < 0) distance = -distance;
-    if (distance < nearest_distance) {
-      nearest_distance = distance;
-      nearest_value = value;
-      nearest_y = y;
-    }
-  }
-  if (nearest_value > 0) {
-    char label[16];
-    snprintf(label, sizeof(label), "%d", nearest_value / 10);
-    GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
-    GSize text_size = graphics_text_layout_get_content_size(
-      label, font, GRect(0, 0, 80, 20),
-      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft);
-    int progress = (STEP_PX - nearest_distance) * 100 / STEP_PX;
-    progress = progress * progress * (300 - 2 * progress) / 10000;
-    int target_w = text_size.w + 12;
-    if (target_w < 20) target_w = 20;
-    int oval_w = 1 + (target_w - 1) * progress / 100;
-    int oval_h = 1 + 19 * progress / 100;
-    if (oval_h >= 2 && oval_w >= 2) {
-      int bubble_cx = 17 + text_size.w / 2;
-      GRect bubble = GRect(bubble_cx - oval_w / 2,
-                           readout_y - oval_h / 2, oval_w, oval_h);
-      graphics_context_set_fill_color(ctx, GColorWhite);
-      graphics_fill_rect(ctx, bubble, oval_h / 2, GCornersAll);
-      graphics_context_set_stroke_color(ctx, GColorRed);
-      graphics_context_set_stroke_width(ctx, 2);
-      graphics_draw_round_rect(ctx, bubble, oval_h / 2);
-      graphics_context_set_text_color(ctx, GColorBlack);
-      graphics_draw_text(ctx, label, font,
-        GRect(17, nearest_y - 10, 42, 22),
-        GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-    }
-  }
+  graphics_draw_line(ctx, GPoint(ruler_x, readout_y),
+                     GPoint(ruler_x + 32, readout_y));
   char weight[24];
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
   draw_pixel_weight(ctx, weight, bounds.size.w);
