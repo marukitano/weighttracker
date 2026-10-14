@@ -468,19 +468,10 @@ static void back_left_click(ClickRecognizerRef recognizer, void *context) {
   change_history(1);
 }
 
-static void back_long_click(ClickRecognizerRef recognizer, void *context) {
-  back_expand_set(true);
-}
-
-static void back_long_release(ClickRecognizerRef recognizer, void *context) {
-  back_expand_set(false);
-}
-
 static void click_config_provider(void *context) {
   window_raw_click_subscribe(BUTTON_ID_UP, button_raw_down, button_raw_up, NULL);
   window_raw_click_subscribe(BUTTON_ID_SELECT, button_raw_down, button_raw_up, NULL);
   window_single_click_subscribe(BUTTON_ID_BACK, back_left_click);
-  window_long_click_subscribe(BUTTON_ID_BACK, 500, back_long_click, back_long_release);
 
 }
 
