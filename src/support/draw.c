@@ -262,7 +262,9 @@ static void draw_measurement_labels(GContext *ctx, GPoint marker,
   if (height_cm >= 100) {
     double meters = height_cm / 100.0;
     double bmi = weight / (meters * meters);
-    snprintf(bmi_text, sizeof(bmi_text), "%.1f", bmi);
+    int bmi_tenths = (int)(bmi * 10.0 + 0.5);
+    snprintf(bmi_text, sizeof(bmi_text), "%d.%d",
+             bmi_tenths / 10, bmi_tenths % 10);
   } else {
     snprintf(bmi_text, sizeof(bmi_text), "--");
   }
