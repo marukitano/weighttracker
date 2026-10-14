@@ -10,21 +10,32 @@ var clay = null;
 function customSettingsPage() {
   var page = this;
   page.on(page.EVENTS.AFTER_BUILD, function() {
+    // Render controls explicitly: Clay text elements are not reliable DOM hosts.
     var csv = page.meta.userData.csv || '';
-    var status = document.getElementById('wt-export-status');
-    var area = document.getElementById('wt-export-csv');
-    var download = document.getElementById('wt-export-download');
-    var copy = document.getElementById('wt-export-copy');
-    if (!status || !area || !download || !copy) return;
-    status.textContent = csv ? 'Ready: ' + (csv.split('\n').length - 2) + ' measurements' :
-      'No measurements received. Please open WeightTracker on your Pebble and try again.';
+    var container = document.createElement('div');
+    container.style.padding = '16px';
+    container.style.background = '#fff';
+    container.style.margin = '10px 0';
+    var heading = document.createElement('h3');
+    heading.textContent = 'Export measurements';
+    container.appendChild(heading);
+    var status = document.createElement('p');
+    var area = document.createElement('textarea');
+    area.style.cssText = 'display:none;width:100%;height:160px;box-sizing:border-box';
+    var download = document.createElement('button');
+    download.type = 'button';
+    download.textContent = 'Download CSV';
+    download.style.marginRight = '8px';
+    var copy = document.createElement('button');
+    copy.type = 'button';
+    copy.textContent = 'Show / copy CSV';
+    status.textContent = csv ?
+      (csv.split('\n').length - 2) + ' measurements ready.' :
+      'No readings received. Open WeightTracker on the watch, then reopen these settings.';
     download.disabled = !csv;
     copy.disabled = !csv;
     area.value = csv;
     download.addEventListener('click', function() {
-      if (!csv) return;
-      // Browsers can save the file. Some Pebble companion WebViews block downloads;
-      // in that case use Show / copy CSV.
       var blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'});
       var url = URL.createObjectURL(blob);
       var link = document.createElement('a');
@@ -39,8 +50,16 @@ function customSettingsPage() {
       area.style.display = 'block';
       area.focus();
       area.select();
-      status.textContent = 'CSV selected. Copy the text and save it as weighttracker-export.csv if download is blocked.';
+      status.textContent = 'CSV selected. Copy this text if downloading is blocked.';
     });
+    container.appendChild(status);
+    container.appendChild(download);
+    container.appendChild(copy);
+    container.appendChild(area);
+    // Insert ahead of the Save button, without interfering with Clay settings.
+    var submit = document.querySelector('button[type="submit"],input[type="submit"]');
+    if (submit && submit.parentNode) submit.parentNode.insertBefore(container, submit);
+    else document.body.appendChild(container);
   });
 }
 
@@ -102,6 +121,30 @@ Pebble.addEventListener('showConfiguration', function() {
 
 Pebble.addEventListener('webviewclosed', function(event) {
   if (!event || !event.response || !clay) return;
-  var settings = clay.getSettings(event.response);
-  Pebble.sendAppMessage(settings);
+  var settings;
+  try {
+    settings = clay.getSettings(event.response);
+  } catch (e) {
+    console.log('Unable to parse WeightTracker settings: ' + e);
+    return;
+  }
+  // Explicitly deliver the supported key/value pairs to Pebble. The Clay
+  // message-key mapping can vary between SDK-generated builds.
+  var keys = require('message_keys');
+  var result = {};
+  var names = ['UNIT', 'HEIGHT_CM', 'CHART_MODE', 'CHART_RANGE',
+               'LABEL_ABOVE', 'LABEL_BELOW'];
+  names.forEach(function(name) {
+    var id = keys[name];
+    var value = settings[id];
+    if (value === undefined) value = settings[name];
+    if (value === undefined) return;
+    result[id] = parseInt(value, 10);
+  });
+  console.log('Sending settings: ' + JSON.stringify(result));
+  Pebble.sendAppMessage(result, function() {
+    console.log('WeightTracker settings delivered');
+  }, function(error) {
+    console.log('WeightTracker settings failed: ' + JSON.stringify(error));
+  });
 });
