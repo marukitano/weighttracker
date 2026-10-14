@@ -309,6 +309,8 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   if (count > HISTORY_CAPACITY) count = HISTORY_CAPACITY;
   GPoint points[HISTORY_CAPACITY];
   double values[HISTORY_CAPACITY];
+  double min_weight = 0, max_weight = 0;
+  bool found = false;
   int selected = count - 1 - s_selected_history_offset;
   if (selected < 0) selected = 0;
   if (selected >= count) selected = count - 1;
