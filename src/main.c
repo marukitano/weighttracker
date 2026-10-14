@@ -472,19 +472,29 @@ static void button_raw_up(ClickRecognizerRef recognizer, void *context) {
   s_button_anim_timer = app_timer_register(55, button_anim_tick, NULL);
 }
 
+static bool s_back_press_rising = false;
 static void back_press_tick(void *context) {
   s_back_press_timer = NULL;
-  if (s_back_width > 5) --s_back_width;
+  // Mirror the right buttons' exact 55 ms, one-pixel 5 -> 7 -> 5 pulse.
+  if (s_back_press_rising) {
+    if (s_back_width < 7) ++s_back_width;
+    if (s_back_width >= 7) s_back_press_rising = false;
+  } else if (s_back_width > 5) {
+    --s_back_width;
+  }
   if (s_back_marker) layer_mark_dirty(s_back_marker);
-  if (s_back_width > 5)
+  if (s_back_press_rising || s_back_width > 5)
     s_back_press_timer = app_timer_register(55, back_press_tick, NULL);
 }
 
 static void back_left_click(ClickRecognizerRef recognizer, void *context) {
-  // Pebble reserves long BACK presses; animate its short-click action.
-  if (s_back_press_timer) app_timer_cancel(s_back_press_timer);
-  s_back_width = 7;
-  if (s_back_marker) layer_mark_dirty(s_back_marker);
+  // BACK has no usable release callback; replay the same right-button pulse.
+  if (s_back_press_timer) {
+    app_timer_cancel(s_back_press_timer);
+    s_back_press_timer = NULL;
+  }
+  s_back_width = 5;
+  s_back_press_rising = true;
   s_back_press_timer = app_timer_register(55, back_press_tick, NULL);
   change_history(1);
 }
