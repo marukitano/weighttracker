@@ -109,7 +109,7 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
-    if (i == 2 || s_button_enter_x[i] >= 30) continue;
+    if (s_button_enter_x[i] >= 30) continue;
     int shift = s_button_enter_x[i];
     // Swiss Chronograph: stretch the tab back to the physical edge.
     int marker_width = s_button_width[i] + (shift > 0 ? shift : 0);
@@ -119,7 +119,14 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
                        5, GCornersLeft);
     const int icon_right = edge_x - 14 + shift;
     const int icon_left = icon_right - 13;
-    if (i == 1) {
+    if (i == 2) {
+      // Add a measurement.
+      const int cx = (icon_left + icon_right) / 2;
+      graphics_draw_line(ctx, GPoint(cx - 6, center_y[i]),
+                         GPoint(cx + 6, center_y[i]));
+      graphics_draw_line(ctx, GPoint(cx, center_y[i] - 6),
+                         GPoint(cx, center_y[i] + 6));
+    } else if (i == 1) {
       // Two-line list icon: longer upper stroke, shorter lower stroke.
       graphics_draw_line(ctx, GPoint(icon_left, center_y[i] - 4),
                          GPoint(icon_right, center_y[i] - 4));
@@ -294,7 +301,7 @@ static void button_enter_tick(void *context) {
 static void button_intro_tick(void *context) {
   s_button_intro_timer = NULL;
   s_buttons_introduced = true;
-  for (int i = 0; i < 2; ++i) {
+  for (int i = 0; i < 3; ++i) {
     s_button_entering[i] = true;
     s_button_enter_frame[i] = 0;
   }
@@ -435,6 +442,7 @@ static void button_anim_tick(void *context) {
   } else {
     s_active_button = -1;
     if (i == 1) show_details();
+    else if (i == 2) show_input();
   }
 }
 
@@ -467,6 +475,7 @@ static void back_left_click(ClickRecognizerRef recognizer, void *context) {
 static void click_config_provider(void *context) {
   window_raw_click_subscribe(BUTTON_ID_UP, button_raw_down, button_raw_up, NULL);
   window_raw_click_subscribe(BUTTON_ID_SELECT, button_raw_down, button_raw_up, NULL);
+  window_raw_click_subscribe(BUTTON_ID_DOWN, button_raw_down, button_raw_up, NULL);
   window_single_click_subscribe(BUTTON_ID_BACK, back_left_click);
 
 }
