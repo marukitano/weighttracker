@@ -92,7 +92,7 @@ Pebble.addEventListener('showConfiguration', function() {
   exportTimer = setTimeout(function() {
     exporting = false;
     openSettings();
-  }, 10000);
+  }, 5000);
   Pebble.sendAppMessage({EXPORT_REQUEST: 1}, function() {}, function() {
     exporting = false;
     if (exportTimer) clearTimeout(exportTimer);
