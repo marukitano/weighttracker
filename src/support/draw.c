@@ -40,7 +40,7 @@ static int visible_offset(int offset) {
   for (int i = 0; i < get_history_count(); ++i) {
     uint32_t date = get_history_date(i);
     long age = days(date, today);
-    if (age < 0 || age >= get_chart_range()) continue;
+    if (age < 0 || age > get_chart_range()) continue;
     if (seen++ == offset) return i;
   }
   return -1;
@@ -60,7 +60,7 @@ int get_chart_history_count(void) {
   int count = 0;
   for (int i = 0; i < get_history_count(); ++i) {
     long age = days(get_history_date(i), get_current_date());
-    if (age >= 0 && age < get_chart_range()) ++count;
+    if (age >= 0 && age <= get_chart_range()) ++count;
   }
   return count;
 }
@@ -351,7 +351,8 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     if (selected >= count) selected = count - 1;
   } else {
     // Calendar mode preserves true horizontal date spacing.
-    count = range;
+    // Include the currently selected day plus the requested days to its left.
+    count = range + 1;
     uint32_t today = get_current_date();
     int first_known = -1;
     for (int i = 0; i < count; ++i) {
