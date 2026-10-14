@@ -42,11 +42,11 @@ static void refresh(void) {
 
 static void button_bounce_tick(void *context) {
   s_button_bounce_timer = NULL;
-  if (s_button_bounce_frame + 1 < sizeof(BUTTON_BOUNCE_X)) {
+  if ((size_t)(s_button_bounce_frame + 1) < sizeof(BUTTON_BOUNCE_X)) {
     ++s_button_bounce_frame;
     s_button_bounce_x = BUTTON_BOUNCE_X[s_button_bounce_frame];
     refresh();
-    if (s_button_bounce_frame + 1 < sizeof(BUTTON_BOUNCE_X))
+    if ((size_t)(s_button_bounce_frame + 1) < sizeof(BUTTON_BOUNCE_X))
       s_button_bounce_timer = app_timer_register(42, button_bounce_tick, NULL);
   }
 }
