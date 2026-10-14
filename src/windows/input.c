@@ -176,7 +176,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
        fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
        GRect(10, cy - 38, bounds.size.w - 20, 34),
        GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-    graphics_draw_text(ctx, "Back: delete  |  Up: cancel",
+    graphics_draw_text(ctx, "Down: delete | Select: cancel",
        fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
        GRect(10, cy + 4, bounds.size.w - 20, 30),
        GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
@@ -205,25 +205,31 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
   draw_pixel_weight(ctx, weight, bounds.size.w);
 
-  // Left delete marker appears only when editing.
-  if (s_edit_offset >= 0) {
-    graphics_context_set_fill_color(ctx, GColorRed);
-    graphics_fill_circle(ctx, GPoint(0, 36), 26);
-    graphics_context_set_stroke_color(ctx, GColorWhite);
-    graphics_context_set_stroke_width(ctx, 3);
-    graphics_draw_line(ctx, GPoint(9, 29), GPoint(21, 43));
-    graphics_draw_line(ctx, GPoint(9, 43), GPoint(21, 29));
-  }
-  // Right save marker.
+  // Match the main screen's narrow 5x52 side tabs.
+  const int edge_x = bounds.size.w;
+  const int center_y = bounds.size.h / 2;
+  const int bottom_y = bounds.size.h - 36;
   graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(bounds.size.w - 25, 10, 25, 52),
+  graphics_fill_rect(ctx, GRect(edge_x - 5, center_y - 26, 5, 52),
                      5, GCornersLeft);
-  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_line(ctx, GPoint(bounds.size.w - 20, 36),
-                          GPoint(bounds.size.w - 15, 42));
-  graphics_draw_line(ctx, GPoint(bounds.size.w - 15, 42),
-                          GPoint(bounds.size.w - 6, 29));
+  // Save: check mark next to the middle right button.
+  graphics_draw_line(ctx, GPoint(edge_x - 23, center_y),
+                     GPoint(edge_x - 18, center_y + 5));
+  graphics_draw_line(ctx, GPoint(edge_x - 18, center_y + 5),
+                     GPoint(edge_x - 10, center_y - 6));
+
+  // Cancel new entry (black) or delete edited entry (red).
+  GColor action_color = s_edit_offset >= 0 ? GColorRed : GColorBlack;
+  graphics_context_set_fill_color(ctx, action_color);
+  graphics_fill_rect(ctx, GRect(edge_x - 5, bottom_y - 26, 5, 52),
+                     5, GCornersLeft);
+  graphics_context_set_stroke_color(ctx, action_color);
+  graphics_draw_line(ctx, GPoint(edge_x - 24, bottom_y - 7),
+                     GPoint(edge_x - 12, bottom_y + 7));
+  graphics_draw_line(ctx, GPoint(edge_x - 24, bottom_y + 7),
+                     GPoint(edge_x - 12, bottom_y - 7));
 }
 
 static void save_click(ClickRecognizerRef recognizer, void *context) {
@@ -240,8 +246,11 @@ static void save_click(ClickRecognizerRef recognizer, void *context) {
   window_stack_pop(true);
 }
 
-static void delete_click(ClickRecognizerRef recognizer, void *context) {
-  if (s_edit_offset < 0) { window_stack_pop(true); return; }
+static void cancel_or_delete_click(ClickRecognizerRef recognizer, void *context) {
+  if (s_edit_offset < 0) {
+    window_stack_pop(true);
+    return;
+  }
   if (!s_confirm_delete) {
     s_confirm_delete = true;
     refresh();
@@ -252,9 +261,10 @@ static void delete_click(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void click_config(void *context) {
-  window_single_click_subscribe(BUTTON_ID_UP, save_click);
-  window_single_click_subscribe(BUTTON_ID_BACK, delete_click);
+  window_single_click_subscribe(BUTTON_ID_SELECT, save_click);
+  window_single_click_subscribe(BUTTON_ID_DOWN, cancel_or_delete_click);
 }
+
 
 static void on_appear(Window *window) {
 #if PBL_TOUCH
