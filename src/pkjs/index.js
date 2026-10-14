@@ -26,6 +26,13 @@ Pebble.addEventListener('webviewclosed', function(event) {
         settings[index === 0 ? 65 : 66] = parseInt(value, 10);
       }
     });
+    // Clay can create a spurious "NaN" entry for a custom select field.
+    // Only numerical Pebble message keys are valid; never forward this entry.
+    var outgoing = {};
+    Object.keys(settings).forEach(function(key) {
+      if (/^[0-9]+$/.test(key)) outgoing[key] = settings[key];
+    });
+    settings = outgoing;
     console.log('Settings submitted: ' + JSON.stringify(settings));
     Pebble.sendAppMessage(settings, function() {
       console.log('WeightTracker settings delivered');
