@@ -579,6 +579,13 @@ static void hide_main(void) {
 }
 
 static void config_received(DictionaryIterator *iter, void *context) {
+  // Trace what the phone actually sends. This also catches missing label keys.
+  Tuple *tuple = dict_read_first(iter);
+  while (tuple) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Settings incoming key=%lu type=%d",
+            (unsigned long)tuple->key, (int)tuple->type);
+    tuple = dict_read_next(iter);
+  }
   if (!chart_prefs_apply(iter)) return;
   s_history_offset = 0;
   s_incoming_offset = 0;
