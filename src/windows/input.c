@@ -133,10 +133,6 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, GColorWhite);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_text_color(ctx, GColorBlack);
-  graphics_draw_text(ctx, s_edit_offset >= 0 ? "Edit" : "New",
-    fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-    GRect(10, 10, bounds.size.w - 20, 32),
-    GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   if (s_confirm_delete) {
     graphics_context_set_fill_color(ctx, GColorRed);
@@ -181,11 +177,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, weight, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK),
-    GRect(0, 48, bounds.size.w, 43),
-    GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-  graphics_draw_text(ctx, get_short_unit_name(),
-    fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-    GRect(0, bounds.size.h - 34, bounds.size.w, 25),
+    GRect(0, 8, bounds.size.w, 43),
     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // Left delete marker appears only when editing.
