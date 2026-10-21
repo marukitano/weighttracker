@@ -235,7 +235,10 @@ static void draw_mode_label(GContext *ctx, int screen_width, int screen_height) 
   const int letter_pitch = 6 * scale;
   const int length = s_edit_offset >= 0 ? 4 : 3;
   const int x0 = (screen_width - 7 * scale) / 2;
-  const int y0 = (screen_height - length * letter_pitch) / 2;
+  // Center within the area BELOW the large weight digits (y=9..36),
+  // rather than within the entire screen.
+  const int weight_bottom = 9 + 7 * 4;
+  const int y0 = weight_bottom + (screen_height - weight_bottom - length * letter_pitch) / 2;
 
   graphics_context_set_fill_color(ctx, GColorLightGray);
   for (int c = 0; c < length; ++c) {
