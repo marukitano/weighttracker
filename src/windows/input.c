@@ -231,7 +231,7 @@ static int mode_letter_index(char c) {
 
 static void draw_mode_label(GContext *ctx, int screen_width, int screen_height) {
   const char *label = s_edit_offset >= 0 ? "EDIT" : "NEW";
-  const int scale = 3;
+  const int scale = 4;
   const int letter_pitch = 6 * scale;
   const int length = s_edit_offset >= 0 ? 4 : 3;
   const int x0 = (screen_width - 7 * scale) / 2;
