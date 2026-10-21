@@ -138,15 +138,13 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(cx + 4, cy - 8),
                          GPoint(cx + 8, cy - 4));
 
-      // Narrower wooden nib meets at one clean point (no flat tip).
-      graphics_context_set_stroke_width(ctx, 1);
+      // Pencil tip uses the same 2px stroke as the barrel.
       graphics_draw_line(ctx, GPoint(cx - 7, cy + 3),
                          GPoint(cx - 10, cy + 10));
       graphics_draw_line(ctx, GPoint(cx - 3, cy + 7),
                          GPoint(cx - 10, cy + 10));
       graphics_draw_line(ctx, GPoint(cx - 7, cy + 3),
                          GPoint(cx - 3, cy + 7));
-      graphics_context_set_stroke_width(ctx, 2);
     } else {
       // Upper key: right chevron (newer measurement).
       const int mid_x = (icon_left + icon_right) / 2;
