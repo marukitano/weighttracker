@@ -98,7 +98,7 @@ static void pulse_timer_callback(void *context) {
 // Edge-mounted button marker, matching the Swiss Chronograph's
 // 5px x 52px rounded-left hardware-button indicator.
 // Three Swiss-Chronograph-style button markers aligned with the Time 2 keys.
-// Upper: back (<), middle: list, lower: forward (>).
+// Upper: next measurement (>), middle: edit (pencil), lower: new (+).
 static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int center_y[3] = {36, bounds.size.h / 2, bounds.size.h - 36};
@@ -127,11 +127,23 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(cx, center_y[i] - 6),
                          GPoint(cx, center_y[i] + 6));
     } else if (i == 1) {
-      // Two-line list icon: longer upper stroke, shorter lower stroke.
-      graphics_draw_line(ctx, GPoint(icon_left, center_y[i] - 4),
-                         GPoint(icon_right, center_y[i] - 4));
-      graphics_draw_line(ctx, GPoint(icon_left, center_y[i] + 4),
-                         GPoint(icon_right - 5, center_y[i] + 4));
+      // Recognizable tilted pencil instead of the old ambiguous list icon.
+      // Outline the pencil barrel, angled down to its writing tip.
+      const int cx = (icon_left + icon_right) / 2 + 2;
+      const int cy = center_y[i];
+      graphics_draw_line(ctx, GPoint(cx - 7, cy + 2),
+                         GPoint(cx + 5, cy - 10));
+      graphics_draw_line(ctx, GPoint(cx - 3, cy + 6),
+                         GPoint(cx + 9, cy - 6));
+      // Flat eraser at the top, nib and graphite at the bottom.
+      graphics_draw_line(ctx, GPoint(cx + 5, cy - 10),
+                         GPoint(cx + 9, cy - 6));
+      graphics_draw_line(ctx, GPoint(cx - 7, cy + 2),
+                         GPoint(cx - 9, cy + 11));
+      graphics_draw_line(ctx, GPoint(cx - 3, cy + 6),
+                         GPoint(cx - 9, cy + 11));
+      graphics_draw_line(ctx, GPoint(cx - 9, cy + 11),
+                         GPoint(cx - 7, cy + 11));
     } else {
       // Upper key: right chevron (newer measurement).
       const int mid_x = (icon_left + icon_right) / 2;
