@@ -206,6 +206,54 @@ static void draw_trash_icon(GContext *ctx, int x, int y, int red_edge) {
   }
 }
 
+// Pixel letters for the editor mode: rotate the complete word clockwise,
+// so NEW / EDIT reads from top to bottom and stays centered on the screen.
+static const uint8_t s_mode_letters[6][7] = {
+  {31,16,16,30,16,16,31}, // E
+  {30,17,17,17,17,17,30}, // D
+  {31,4,4,4,4,4,31},       // I
+  {31,4,4,4,4,4,4},        // T
+  {17,25,21,19,17,17,17}, // N
+  {17,17,17,21,21,21,10}  // W
+};
+
+static int mode_letter_index(char c) {
+  switch (c) {
+    case 'E': return 0;
+    case 'D': return 1;
+    case 'I': return 2;
+    case 'T': return 3;
+    case 'N': return 4;
+    case 'W': return 5;
+    default: return -1;
+  }
+}
+
+static void draw_mode_label(GContext *ctx, int screen_width, int screen_height) {
+  const char *label = s_edit_offset >= 0 ? "EDIT" : "NEW";
+  const int scale = 3;
+  const int letter_pitch = 6 * scale;
+  const int length = s_edit_offset >= 0 ? 4 : 3;
+  const int x0 = (screen_width - 7 * scale) / 2;
+  const int y0 = (screen_height - length * letter_pitch) / 2;
+
+  graphics_context_set_fill_color(ctx, GColorLightGray);
+  for (int c = 0; c < length; ++c) {
+    int index = mode_letter_index(label[c]);
+    if (index < 0) continue;
+    for (int row = 0; row < 7; ++row) {
+      for (int col = 0; col < 5; ++col) {
+        if (!(s_mode_letters[index][row] & (1 << (4 - col)))) continue;
+        // Rotated 90 degrees clockwise; individual letters stay readable
+        // when the watch is turned sideways.
+        graphics_fill_rect(ctx,
+          GRect(x0 + (6 - row) * scale, y0 + c * letter_pitch + col * scale,
+                scale, scale), 0, GCornerNone);
+      }
+    }
+  }
+}
+
 static void draw_canvas(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int ruler_x = 0;
@@ -236,6 +284,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   char weight[24];
   snprintf(weight, sizeof(weight), "%d.%d", s_tenths / 10, s_tenths % 10);
   draw_pixel_weight(ctx, weight, bounds.size.w);
+  draw_mode_label(ctx, bounds.size.w, bounds.size.h);
 
   // Main-screen-style spring entrance, 5x52 tabs on the right edge.
   if (s_button_bounce_x < 30) {
