@@ -127,23 +127,26 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
       graphics_draw_line(ctx, GPoint(cx, center_y[i] - 6),
                          GPoint(cx, center_y[i] + 6));
     } else if (i == 1) {
-      // Recognizable tilted pencil instead of the old ambiguous list icon.
-      // Outline the pencil barrel, angled down to its writing tip.
-      const int cx = (icon_left + icon_right) / 2 + 2;
+      // Clean, diagonally tilted pencil with a sharply tapered graphite tip.
+      const int cx = (icon_left + icon_right) / 2;
       const int cy = center_y[i];
-      graphics_draw_line(ctx, GPoint(cx - 7, cy + 2),
-                         GPoint(cx + 5, cy - 10));
-      graphics_draw_line(ctx, GPoint(cx - 3, cy + 6),
-                         GPoint(cx + 9, cy - 6));
-      // Flat eraser at the top, nib and graphite at the bottom.
-      graphics_draw_line(ctx, GPoint(cx + 5, cy - 10),
-                         GPoint(cx + 9, cy - 6));
-      graphics_draw_line(ctx, GPoint(cx - 7, cy + 2),
-                         GPoint(cx - 9, cy + 11));
-      graphics_draw_line(ctx, GPoint(cx - 3, cy + 6),
-                         GPoint(cx - 9, cy + 11));
-      graphics_draw_line(ctx, GPoint(cx - 9, cy + 11),
-                         GPoint(cx - 7, cy + 11));
+      // Straight, parallel barrel edges and a squared-off eraser end.
+      graphics_draw_line(ctx, GPoint(cx - 7, cy + 3),
+                         GPoint(cx + 4, cy - 8));
+      graphics_draw_line(ctx, GPoint(cx - 3, cy + 7),
+                         GPoint(cx + 8, cy - 4));
+      graphics_draw_line(ctx, GPoint(cx + 4, cy - 8),
+                         GPoint(cx + 8, cy - 4));
+
+      // Narrower wooden nib meets at one clean point (no flat tip).
+      graphics_context_set_stroke_width(ctx, 1);
+      graphics_draw_line(ctx, GPoint(cx - 7, cy + 3),
+                         GPoint(cx - 10, cy + 10));
+      graphics_draw_line(ctx, GPoint(cx - 3, cy + 7),
+                         GPoint(cx - 10, cy + 10));
+      graphics_draw_line(ctx, GPoint(cx - 7, cy + 3),
+                         GPoint(cx - 3, cy + 7));
+      graphics_context_set_stroke_width(ctx, 2);
     } else {
       // Upper key: right chevron (newer measurement).
       const int mid_x = (icon_left + icon_right) / 2;
