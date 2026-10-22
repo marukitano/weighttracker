@@ -1,3 +1,4 @@
+require('./sync');
 var Clay = require('@rebble/clay');
 var config = require('./config.json');
 var clay = new Clay(config, null, {autoHandleEvents: false});
