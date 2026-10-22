@@ -664,7 +664,6 @@ void set_current(double weight) {
   history_add(dt, weight);
   history_save();
   sync_metadata_save();
-  sync_notify_local_change();
   data[TODAY_INDEX].weight = weight;
   data[TODAY_INDEX].date = dt;
   data[TODAY_INDEX].measured = 1;
@@ -673,6 +672,8 @@ void set_current(double weight) {
   snprintf(info, 20, "%s %s", wstr, get_short_unit_name());
 
   add_pin(MEASUREMENT, get_next_pin_id(MEASUREMENT), dt, mt, info);
+  // Send only after the local cache and any pending timeline pin are ready.
+  sync_notify_local_change();
 }
 
 void move_back(void) {
