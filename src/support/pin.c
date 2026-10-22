@@ -17,6 +17,20 @@ const uint32_t PIN_WEIGHT = 6;
 static QueueInstance *qi;
 static int tries = 0;
 static bool msg_busy = false;
+static AppTimer *s_pin_retry_timer;
+static int s_pin_begin_attempts;
+
+void process_next_pin(void);
+
+static void pin_retry_tick(void *context) {
+  s_pin_retry_timer = NULL;
+  if (qi && queue_length(qi) > 0) process_next_pin();
+}
+
+static void pin_retry_if_busy(void) {
+  // A history chunk may own the one Pebble outbox. Retry once it is free.
+  if (!s_pin_retry_timer) s_pin_retry_timer = app_timer_register(650, pin_retry_tick, NULL);
+}
 
 #if __TESTING == 1
 char *tr_ptype(PinType pt) {
@@ -78,9 +92,18 @@ void delete_pin_execute(PinData* pd) {
 #endif
 
   if (iterator == NULL) {
-    LOG_ERROR("--- Beginning failed, null iter. Reason: %s", translate_error(result));
+    if (++s_pin_begin_attempts < 10) {
+      pin_retry_if_busy();
+    } else {
+      // Do not block the entire pin queue forever when the phone is offline.
+      s_pin_begin_attempts = 0;
+      queue_remove(qi);
+      msg_busy = false;
+      process_next_pin();
+    }
     return;
   }
+  s_pin_begin_attempts = 0;
 
   dict_write_uint32(iterator, PIN_COMMAND, DELETE);
   dict_write_uint32(iterator, PIN_TYPE, pd->ptype);
@@ -103,9 +126,18 @@ void add_pin_execute(PinData* pd) {
 #endif
 
   if (iterator == NULL) {
-    LOG_ERROR("--- Beginning failed, null iter. Reason: %s", translate_error(result));
+    if (++s_pin_begin_attempts < 10) {
+      pin_retry_if_busy();
+    } else {
+      // Do not block the entire pin queue forever when the phone is offline.
+      s_pin_begin_attempts = 0;
+      queue_remove(qi);
+      msg_busy = false;
+      process_next_pin();
+    }
     return;
   }
+  s_pin_begin_attempts = 0;
 
   dict_write_uint32(iterator, PIN_COMMAND, ADD);
   dict_write_uint32(iterator, PIN_TYPE, pd->ptype);
@@ -166,7 +198,9 @@ void pin_initialize() {
 }
 
 void pin_deinitalize() {
+  if (s_pin_retry_timer) { app_timer_cancel(s_pin_retry_timer); s_pin_retry_timer = NULL; }
   queue_destroy_instance(qi);
+  qi = NULL;
 }
 
 void delete_pin(PinType pin_type, uint32_t pin_id) {
