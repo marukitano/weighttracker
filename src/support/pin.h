@@ -17,3 +17,6 @@ void delete_pin(PinType pin_type, uint32_t pin_id);
 void add_pin(PinType pin_type, uint32_t pin_id, uint32_t pin_date, uint32_t pin_time, const char* pin_weight);
 void pin_initialize();
 void pin_deinitalize();
+
+void pin_outbox_sent(DictionaryIterator *iter, void *context);
+void pin_outbox_failed(DictionaryIterator *iter, AppMessageResult reason, void *context);
