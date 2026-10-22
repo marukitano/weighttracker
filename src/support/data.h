@@ -49,3 +49,19 @@ void next_chart_range(void);
 int get_chart_range(void);
 void set_chart_mode(int mode);
 void set_chart_range(int count);
+
+
+// Shared phone/watch history, including deletion markers. Wire format is
+// four little-endian 32-bit integers per record (16 bytes).
+typedef struct {
+  uint32_t id;
+  uint32_t date;
+  int32_t weight_10000; // 0 means deleted
+  uint32_t revision;
+} SyncRecord;
+
+#define SYNC_WATCH_RECORD_LIMIT (HISTORY_CAPACITY + 80)
+int sync_record_count(void);
+bool sync_get_record(int index, SyncRecord *record);
+bool sync_apply_remote_record(const SyncRecord *record);
+void sync_finish_remote_merge(void);
