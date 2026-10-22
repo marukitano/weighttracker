@@ -16,6 +16,7 @@ var upload = null;
 var downloadBusy = false;
 var queuedStart = false;
 var storageDamaged = false;
+var retryAttempts = 0;
 
 function field(dict, name, key) {
   return Object.prototype.hasOwnProperty.call(dict, name) ? dict[name] : dict[key];
@@ -132,10 +133,11 @@ function requestUpload() {
     return;
   }
   send(START, null, null, null, function() {
+    retryAttempts = 0;
     console.log('WeightTracker history sync requested');
   }, function() {
-    // A temporary Bluetooth interruption must not modify either archive.
-    setTimeout(requestUpload, 4000);
+    // Limit retries to avoid repeated Bluetooth wakeups when disconnected.
+    if (++retryAttempts < 5) setTimeout(requestUpload, 4000);
   });
 }
 
@@ -147,7 +149,7 @@ function sendDownload(records) {
     downloadBusy = false;
     // Phone data is already committed. Reconnect and retry the full
     // exchange instead of leaving the other watch with partial history.
-    setTimeout(requestUpload, 4000);
+    if (++retryAttempts < 5) setTimeout(requestUpload, 4000);
   }
   function step() {
     if (offset >= snapshot.length) {
