@@ -138,7 +138,7 @@ void process_next_pin() {
   }
 }
 
-static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+void pin_outbox_failed(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
   LOG_ERROR("--- Send failed! (%s)", translate_error(reason));
 
   if (queue_length(qi) > 0) {
@@ -153,18 +153,15 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
   }
 }
 
-static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+void pin_outbox_sent(DictionaryIterator *iterator, void *context) {
   LOG_INFO("+++ Send success!");
   queue_remove(qi);
   process_next_pin();
 }
 
 void pin_initialize() {
-  //app_message_register_inbox_received(NULL);
-  //app_message_register_inbox_dropped(NULL);
-  app_message_register_outbox_failed(outbox_failed_callback);
-  app_message_register_outbox_sent(outbox_sent_callback);
-  app_message_open(APP_MESSAGE_INBOX_SIZE_MINIMUM, APP_MESSAGE_OUTBOX_SIZE_MINIMUM);
+  // Sync registers the shared AppMessage callbacks/buffers; pin retains
+  // its own queue and is notified only for pin-message acknowledgements.
   qi = queue_create_instance();
 }
 
