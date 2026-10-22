@@ -1,6 +1,7 @@
 #include <pebble.h>
 #include "sync.h"
 #include "data.h"
+#include "pin.h"
 
 #define SYNC_CHUNK_RECORDS 8
 #define SYNC_BYTES_PER_RECORD 16
@@ -28,6 +29,15 @@ static SyncRecord s_upload_records[SYNC_WATCH_RECORD_LIMIT];
 static SyncRecord s_download_records[SYNC_WATCH_RECORD_LIMIT];
 static int s_download_expected;
 static int s_download_count;
+static AppTimer *s_retry_timer;
+static int s_retry_attempts;
+static void retry_upload(void *context);
+
+static void schedule_retry(void) {
+  if (s_retry_timer || s_retry_attempts >= 5) return;
+  ++s_retry_attempts;
+  s_retry_timer = app_timer_register(1200, retry_upload, NULL);
+}
 
 static uint32_t read_u32(const uint8_t *bytes) {
   return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8)
@@ -93,11 +103,18 @@ static void begin_upload(void) {
   if (!send_upload_packet(SYNC_UPLOAD_BEGIN)) {
     s_upload_active = false;
     s_upload_pending = true;
-    s_phone_ready = false;
+    schedule_retry();
   }
 }
 
 static void outbox_sent(DictionaryIterator *iter, void *context) {
+  // Timeline pins share the outbox; their acknowledgements must not
+  // advance the measurement transfer.
+  if (!dict_find(iter, MESSAGE_KEY_SYNC_COMMAND)) {
+    pin_outbox_sent(iter, context);
+    if (s_upload_pending) schedule_retry();
+    return;
+  }
   if (!s_upload_active) return;
   if (s_upload_phase == SYNC_UPLOAD_END) {
     s_upload_active = false;
@@ -115,19 +132,30 @@ static void outbox_sent(DictionaryIterator *iter, void *context) {
   if (!send_upload_packet(s_upload_phase)) {
     s_upload_active = false;
     s_upload_pending = true;
-    s_phone_ready = false;
+    schedule_retry();
   }
 }
 
 static void outbox_failed(DictionaryIterator *iter, AppMessageResult reason,
                           void *context) {
+  if (!dict_find(iter, MESSAGE_KEY_SYNC_COMMAND)) {
+    pin_outbox_failed(iter, reason, context);
+    if (s_upload_pending) schedule_retry();
+    return;
+  }
   // Keep all unsent edits in Pebble persistent storage. Next app launch
   // starts a new full exchange instead of trusting a partial transfer.
   s_upload_active = false;
   s_upload_phase = 0;
   s_upload_pending = true;
-  s_phone_ready = false;
+  schedule_retry();
   APP_LOG(APP_LOG_LEVEL_WARNING, "History upload failed: %d", reason);
+}
+
+static void retry_upload(void *context) {
+  s_retry_timer = NULL;
+  if (s_upload_pending && !s_upload_active && !s_download_active)
+    begin_upload();
 }
 
 static void apply_download(void) {
@@ -150,6 +178,9 @@ void sync_on_inbox(DictionaryIterator *iter) {
   int command = command_tuple->value->int32;
   if (command == SYNC_START) {
     s_phone_ready = true;
+    s_retry_attempts = 0;
+    if (s_retry_timer) { app_timer_cancel(s_retry_timer); s_retry_timer = NULL; }
+    s_upload_pending = true;
     s_download_active = false;
     s_download_complete = false;
     s_upload_active = false;
@@ -219,6 +250,8 @@ void sync_init(void) {
   s_upload_pending = false;
   s_download_active = false;
   s_download_complete = false;
+  s_retry_timer = NULL;
+  s_retry_attempts = 0;
   app_message_register_outbox_sent(outbox_sent);
   app_message_register_outbox_failed(outbox_failed);
 }
