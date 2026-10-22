@@ -5,6 +5,8 @@
 #include "../support/parameters.h"
 #include "../support/reminder.h"
 #include "../support/pin.h"
+#include "../support/sync.h"
+#include <stdlib.h>
 
 // constants
 #define NUM_OF_DAYS 30
@@ -14,6 +16,17 @@
 #define HISTORY_CHUNK_KEY 20
 #define HISTORY_CHUNK_SIZE 20
 #define HISTORY_CHUNKS 5
+// Keep the existing measurement archive untouched for migration. New sync
+// metadata is stored separately; all these ranges are under Pebble's 4KB limit.
+#define SYNC_META_COUNT_KEY 40
+#define SYNC_META_CHUNK_KEY 41
+#define SYNC_TOMB_COUNT_KEY 46
+#define SYNC_TOMB_CHUNK_KEY 47
+#define SYNC_TOMB_CAPACITY 80
+#define SYNC_CLOCK_KEY 51
+#define SYNC_MIGRATED_KEY 52
+#define SYNC_SALT_KEY 53
+#define SYNC_SEQUENCE_KEY 54
 #define LAST_STORED_DATE_KEY 0
 #define UNIT_KEY 1
 #define FORMAT_KEY 2
@@ -64,6 +77,139 @@ typedef struct {
 static HistoryEntry s_history[HISTORY_CAPACITY]; // oldest first
 static int s_history_count = 0;
 
+typedef struct { uint32_t id; uint32_t revision; } SyncMeta;
+static SyncMeta s_meta[HISTORY_CAPACITY];
+static SyncMeta s_tombstones[SYNC_TOMB_CAPACITY];
+static int s_tomb_count;
+static uint32_t s_revision_clock;
+static uint32_t s_sync_salt;
+static uint32_t s_sync_sequence;
+
+static uint32_t sync_new_revision(void) {
+  uint32_t now = (uint32_t)time(NULL);
+  if (now > s_revision_clock) s_revision_clock = now;
+  else ++s_revision_clock;
+  return s_revision_clock;
+}
+
+static bool sync_id_exists(uint32_t id) {
+  if (!id) return true;
+  for (int i = 0; i < s_history_count; ++i)
+    if (s_meta[i].id == id) return true;
+  for (int i = 0; i < s_tomb_count; ++i)
+    if (s_tombstones[i].id == id) return true;
+  return false;
+}
+
+static uint32_t sync_new_id(void) {
+  uint32_t id;
+  do {
+    ++s_sync_sequence;
+    id = (s_sync_sequence * 2654435761u) ^ s_sync_salt;
+    if (!id) id = 1;
+  } while (sync_id_exists(id));
+  return id;
+}
+
+static void sync_metadata_save(void) {
+  for (int chunk = 0; chunk < HISTORY_CHUNKS; ++chunk) {
+    int start = chunk * HISTORY_CHUNK_SIZE;
+    if (start >= s_history_count) {
+      persist_safe_delete(SYNC_META_CHUNK_KEY + chunk);
+      continue;
+    }
+    int n = s_history_count - start;
+    if (n > HISTORY_CHUNK_SIZE) n = HISTORY_CHUNK_SIZE;
+    persist_write_data(SYNC_META_CHUNK_KEY + chunk, &s_meta[start], n * sizeof(SyncMeta));
+  }
+  persist_write_int(SYNC_META_COUNT_KEY, s_history_count);
+  for (int chunk = 0; chunk < 4; ++chunk) {
+    int start = chunk * HISTORY_CHUNK_SIZE;
+    if (start >= s_tomb_count) {
+      persist_safe_delete(SYNC_TOMB_CHUNK_KEY + chunk);
+      continue;
+    }
+    int n = s_tomb_count - start;
+    if (n > HISTORY_CHUNK_SIZE) n = HISTORY_CHUNK_SIZE;
+    persist_write_data(SYNC_TOMB_CHUNK_KEY + chunk, &s_tombstones[start], n * sizeof(SyncMeta));
+  }
+  persist_write_int(SYNC_TOMB_COUNT_KEY, s_tomb_count);
+  persist_write_int(SYNC_CLOCK_KEY, (int32_t)s_revision_clock);
+  persist_write_int(SYNC_SALT_KEY, (int32_t)s_sync_salt);
+  persist_write_int(SYNC_SEQUENCE_KEY, (int32_t)s_sync_sequence);
+}
+
+static void sync_metadata_load(void) {
+  s_revision_clock = persist_exists(SYNC_CLOCK_KEY)
+      ? (uint32_t)persist_read_int(SYNC_CLOCK_KEY) : 0;
+  s_sync_sequence = persist_exists(SYNC_SEQUENCE_KEY)
+      ? (uint32_t)persist_read_int(SYNC_SEQUENCE_KEY) : 0;
+  if (persist_exists(SYNC_SALT_KEY)) {
+    s_sync_salt = (uint32_t)persist_read_int(SYNC_SALT_KEY);
+  } else {
+    // Generated only once per watch installation and persisted. Individual
+    // clocks/boot timing create different salt values on different watches.
+    srand((unsigned int)time(NULL) ^ (unsigned int)(uintptr_t)&s_history);
+    s_sync_salt = ((uint32_t)rand() << 16) ^ (uint32_t)rand()
+                  ^ (uint32_t)time(NULL);
+    if (!s_sync_salt) s_sync_salt = 0x3A5C92D1u;
+  }
+
+  s_tomb_count = persist_exists(SYNC_TOMB_COUNT_KEY)
+      ? persist_read_int(SYNC_TOMB_COUNT_KEY) : 0;
+  if (s_tomb_count < 0 || s_tomb_count > SYNC_TOMB_CAPACITY) s_tomb_count = 0;
+  int loaded = 0;
+  for (int chunk = 0; loaded < s_tomb_count && chunk < 4; ++chunk) {
+    int n = s_tomb_count - loaded;
+    if (n > HISTORY_CHUNK_SIZE) n = HISTORY_CHUNK_SIZE;
+    int bytes = n * (int)sizeof(SyncMeta);
+    if (persist_read_data(SYNC_TOMB_CHUNK_KEY + chunk,
+                          &s_tombstones[loaded], bytes) != bytes) break;
+    loaded += n;
+  }
+  s_tomb_count = loaded;
+
+  int count = persist_exists(SYNC_META_COUNT_KEY)
+      ? persist_read_int(SYNC_META_COUNT_KEY) : -1;
+  loaded = 0;
+  if (count == s_history_count) {
+    for (int chunk = 0; loaded < count && chunk < HISTORY_CHUNKS; ++chunk) {
+      int n = count - loaded;
+      if (n > HISTORY_CHUNK_SIZE) n = HISTORY_CHUNK_SIZE;
+      int bytes = n * (int)sizeof(SyncMeta);
+      if (persist_read_data(SYNC_META_CHUNK_KEY + chunk,
+                            &s_meta[loaded], bytes) != bytes) break;
+      loaded += n;
+    }
+  }
+  // First run after upgrade: assign stable IDs to existing watch records.
+  // The weights/dates themselves have NOT been modified.
+  if (loaded != s_history_count) {
+    for (int i = 0; i < s_history_count; ++i) {
+      s_meta[i].id = sync_new_id();
+      s_meta[i].revision = sync_new_revision();
+    }
+    sync_metadata_save();
+  }
+}
+
+static void sync_add_tombstone(uint32_t id, uint32_t rev) {
+  if (!id) return;
+  for (int i = 0; i < s_tomb_count; ++i)
+    if (s_tombstones[i].id == id) {
+      if (s_tombstones[i].revision < rev) s_tombstones[i].revision = rev;
+      return;
+    }
+  if (s_tomb_count == SYNC_TOMB_CAPACITY) {
+    int oldest = 0;
+    for (int i = 1; i < s_tomb_count; ++i)
+      if (s_tombstones[i].revision < s_tombstones[oldest].revision) oldest = i;
+    s_tombstones[oldest] = s_tombstones[s_tomb_count - 1];
+    --s_tomb_count;
+  }
+  s_tombstones[s_tomb_count++] = (SyncMeta){ .id = id, .revision = rev };
+}
+
 int get_history_count(void) { return s_history_count; }
 double get_history_weight(int newest_offset) {
   int i = s_history_count - 1 - newest_offset;
@@ -83,11 +229,18 @@ static void history_add(uint32_t date, double weight) {
   while (index < s_history_count && s_history[index].date == date) ++index;
   if (s_history_count == HISTORY_CAPACITY) {
     if (index == 0) return; // Older than the oldest retained measurement.
-    for (int j = 1; j < s_history_count; ++j) s_history[j - 1] = s_history[j];
+    for (int j = 1; j < s_history_count; ++j) {
+      s_history[j - 1] = s_history[j];
+      s_meta[j - 1] = s_meta[j];
+    }
     --s_history_count;
     --index;
   }
-  for (int j = s_history_count; j > index; --j) s_history[j] = s_history[j - 1];
+  for (int j = s_history_count; j > index; --j) {
+    s_history[j] = s_history[j - 1];
+    s_meta[j] = s_meta[j - 1];
+  }
+  s_meta[index] = (SyncMeta){ .id = sync_new_id(), .revision = sync_new_revision() };
   s_history[index].date = date;
   s_history[index].weight_10000 = value;
   ++s_history_count;
@@ -138,6 +291,7 @@ bool update_history_weight(int newest_offset, double weight) {
   uint32_t date = s_history[index].date;
   int32_t old_value = s_history[index].weight_10000;
   s_history[index].weight_10000 = (int32_t)(weight * 10000.0 + 0.5);
+  s_meta[index].revision = sync_new_revision();
 
   // Keep the latest reading and the legacy daily cache in sync.
   if (newest_offset == 0) {
@@ -152,6 +306,8 @@ bool update_history_weight(int newest_offset, double weight) {
       data[i].weight = weight;
   }
   history_save();
+  sync_metadata_save();
+  sync_notify_local_change();
   return true;
 }
 
@@ -161,8 +317,11 @@ bool delete_history_weight(int newest_offset) {
   if (index < 0 || index >= s_history_count) return false;
   uint32_t deleted_date = s_history[index].date;
   int32_t deleted_weight = s_history[index].weight_10000;
-  for (int j = index; j + 1 < s_history_count; ++j)
+  sync_add_tombstone(s_meta[index].id, sync_new_revision());
+  for (int j = index; j + 1 < s_history_count; ++j) {
     s_history[j] = s_history[j + 1];
+    s_meta[j] = s_meta[j + 1];
+  }
   --s_history_count;
 
   // Keep legacy daily cache from displaying a deleted measurement.
@@ -190,6 +349,8 @@ bool delete_history_weight(int newest_offset) {
     s_used_already = 0;
   }
   history_save();
+  sync_metadata_save();
+  sync_notify_local_change();
   return true;
 }
 
@@ -300,6 +461,8 @@ void load_data(void) {
   if (s_chart_range < 4) s_chart_range = 4;
   if (s_chart_range > 30) s_chart_range = 30;
   history_load();
+  sync_metadata_load();
+  bool import_legacy = !persist_exists(SYNC_MIGRATED_KEY);
 
   if (persist_exists(REMINDER_FLAG_KEY)) {
     hr = persist_read_int(REMINDER_FLAG_KEY);
@@ -370,8 +533,9 @@ void load_data(void) {
     dt = decrease_date(dt);
   }
 
-  // Import old one-per-day records only when that date is not archived yet.
-  // Without this guard, every app launch would duplicate legacy records.
+  // Import pre-sync daily records exactly once. Later legacy cache keys
+  // must NOT resurrect deleted entries received from another watch.
+  if (import_legacy) {
   if (s_latest_date && s_latest_weight > 0) {
     bool exists = false;
     for (i = 0; i < s_history_count; ++i)
@@ -384,6 +548,10 @@ void load_data(void) {
     for (int j = 0; j < s_history_count; ++j)
       if (s_history[j].date == data[i].date) { exists = true; break; }
     if (!exists) history_add(data[i].date, data[i].weight);
+  }
+  history_save();
+  sync_metadata_save();
+  persist_write_int(SYNC_MIGRATED_KEY, 1);
   }
   if (s_history_count > 0 && s_current_weight < 0) {
     s_current_weight = get_history_weight(0);
@@ -425,6 +593,7 @@ void save_data(void) {
   }
 
   history_save();
+  sync_metadata_save();
   if (!s_used_already) {
     return;
   }
@@ -493,6 +662,9 @@ void set_current(double weight) {
 
   s_used_already = 1;
   history_add(dt, weight);
+  history_save();
+  sync_metadata_save();
+  sync_notify_local_change();
   data[TODAY_INDEX].weight = weight;
   data[TODAY_INDEX].date = dt;
   data[TODAY_INDEX].measured = 1;
@@ -592,4 +764,119 @@ double get_current_version() {
 
 double get_stored_version() {
   return previous_version;
+}
+
+
+int sync_record_count(void) {
+  return s_history_count + s_tomb_count;
+}
+
+bool sync_get_record(int index, SyncRecord *record) {
+  if (!record || index < 0 || index >= sync_record_count()) return false;
+  if (index < s_history_count) {
+    record->id = s_meta[index].id;
+    record->revision = s_meta[index].revision;
+    record->date = s_history[index].date;
+    record->weight_10000 = s_history[index].weight_10000;
+  } else {
+    index -= s_history_count;
+    record->id = s_tombstones[index].id;
+    record->revision = s_tombstones[index].revision;
+    record->date = 0;
+    record->weight_10000 = 0;
+  }
+  return true;
+}
+
+bool sync_apply_remote_record(const SyncRecord *r) {
+  if (!r || !r->id || !r->revision) return false;
+  bool deleted = (r->weight_10000 == 0);
+  if (!deleted && (r->weight_10000 < 0 || r->date < 20000101u ||
+                    r->date > 20991231u)) return false;
+  if (r->revision > s_revision_clock) s_revision_clock = r->revision;
+  for (int t = 0; t < s_tomb_count; ++t) {
+    if (s_tombstones[t].id != r->id) continue;
+    if (s_tombstones[t].revision >= r->revision) return false;
+    if (deleted) {
+      s_tombstones[t].revision = r->revision;
+      return true;
+    }
+    s_tombstones[t] = s_tombstones[--s_tomb_count];
+    break;
+  }
+  for (int i = 0; i < s_history_count; ++i) {
+    if (s_meta[i].id != r->id) continue;
+    if (s_meta[i].revision > r->revision) return false;
+    if (s_meta[i].revision == r->revision) {
+      // A deterministic tie-break; deletions take precedence.
+      if (!deleted && s_history[i].weight_10000 >= r->weight_10000)
+        return false;
+    }
+    if (deleted) {
+      sync_add_tombstone(r->id, r->revision);
+      for (int j = i; j + 1 < s_history_count; ++j) {
+        s_history[j] = s_history[j + 1];
+        s_meta[j] = s_meta[j + 1];
+      }
+      --s_history_count;
+    } else {
+      s_history[i].date = r->date;
+      s_history[i].weight_10000 = r->weight_10000;
+      s_meta[i].revision = r->revision;
+    }
+    return true;
+  }
+  if (deleted) {
+    sync_add_tombstone(r->id, r->revision);
+    return true;
+  }
+  int pos = 0;
+  while (pos < s_history_count && s_history[pos].date <= r->date) ++pos;
+  if (s_history_count == HISTORY_CAPACITY) {
+    if (pos == 0) return false;
+    for (int i = 1; i < s_history_count; ++i) {
+      s_history[i - 1] = s_history[i];
+      s_meta[i - 1] = s_meta[i];
+    }
+    --s_history_count;
+    --pos;
+  }
+  for (int i = s_history_count; i > pos; --i) {
+    s_history[i] = s_history[i - 1];
+    s_meta[i] = s_meta[i - 1];
+  }
+  s_history[pos] = (HistoryEntry){ .date = r->date, .weight_10000 = r->weight_10000 };
+  s_meta[pos] = (SyncMeta){ .id = r->id, .revision = r->revision };
+  ++s_history_count;
+  return true;
+}
+
+void sync_finish_remote_merge(void) {
+  // Rebuild the legacy daily cache so old weights cannot reappear.
+  uint32_t day = get_current_date();
+  for (int i = NUM_OF_DAYS - 1; i >= 0; --i) {
+    data[i].date = day;
+    data[i].weight = -1.0;
+    data[i].measured = 0;
+    for (int j = s_history_count - 1; j >= 0; --j) {
+      if (s_history[j].date == day) {
+        data[i].weight = (double)s_history[j].weight_10000 / 10000.0;
+        data[i].measured = 1;
+        break;
+      }
+    }
+    day = decrease_date(day);
+  }
+  s_used_already = s_history_count > 0;
+  if (s_history_count) {
+    s_current_date = s_history[s_history_count - 1].date;
+    s_current_weight = (double)s_history[s_history_count - 1].weight_10000 / 10000.0;
+  } else {
+    s_current_date = 0;
+    s_current_weight = 80.0;
+  }
+  history_save();
+  sync_metadata_save();
+  // Persist cache as well; this is safe to repeat after connection loss.
+  save_data();
 }
