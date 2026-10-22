@@ -27,6 +27,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "support/pin.h"
 #include "support/parameters.h"
 #include "support/chart_prefs.h"
+#include "support/sync.h"
 #include "windows/input.h"
 #include "windows/wakeup.h"
 #include "main.h"
@@ -608,6 +609,23 @@ static void config_received(DictionaryIterator *iter, void *context) {
   if (s_weight_animation_layer) layer_mark_dirty(s_weight_animation_layer);
 }
 
+void weighttracker_sync_refresh(void) {
+  s_history_offset = 0;
+  s_incoming_offset = 0;
+  s_slide_running = false;
+  set_chart_selected_history_offset(0);
+  if (s_chart) layer_mark_dirty(s_chart);
+  display_info();
+}
+
+static void app_inbox_received(DictionaryIterator *iter, void *context) {
+  if (dict_find(iter, MESSAGE_KEY_SYNC_COMMAND)) {
+    sync_on_inbox(iter);
+  } else {
+    config_received(iter, context);
+  }
+}
+
 void init() {
   pin_initialize();
   s_today = get_year_day();
@@ -618,8 +636,9 @@ void init() {
 
   load_data();
   chart_prefs_load();
-  app_message_register_inbox_received(config_received);
-  app_message_open(256, 64);
+  app_message_register_inbox_received(app_inbox_received);
+  sync_init();
+  app_message_open(256, 256);
   wakeup_service_subscribe(wakeup_handler);
 }
 
