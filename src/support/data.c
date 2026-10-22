@@ -873,7 +873,7 @@ void sync_finish_remote_merge(void) {
     s_current_weight = (double)s_history[s_history_count - 1].weight_10000 / 10000.0;
   } else {
     s_current_date = 0;
-    s_current_weight = 80.0;
+    s_current_weight = -1.0;
   }
   history_save();
   sync_metadata_save();
