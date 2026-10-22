@@ -43,11 +43,11 @@ function loadHistory() {
 }
 
 function isValid(r) {
-  return r && Number.isFinite(r.id) && r.id > 0 && r.id <= 4294967295 &&
+  return r && isFinite(r.id) && r.id > 0 && r.id <= 4294967295 &&
     Math.floor(r.id) === r.id &&
-    Number.isFinite(r.revision) && r.revision > 0 && r.revision <= 4294967295 &&
+    isFinite(r.revision) && r.revision > 0 && r.revision <= 4294967295 &&
     Math.floor(r.revision) === r.revision &&
-    Number.isFinite(r.weight) && Math.floor(r.weight) === r.weight &&
+    isFinite(r.weight) && Math.floor(r.weight) === r.weight &&
     (r.weight === 0 ||
       (r.weight > 0 && r.date >= 20000101 && r.date <= 20991231));
 }
@@ -145,7 +145,9 @@ function sendDownload(records) {
   downloadBusy = true;
   function failure() {
     downloadBusy = false;
-    // The phone already has the merged data. The next launch retries.
+    // Phone data is already committed. Reconnect and retry the full
+    // exchange instead of leaving the other watch with partial history.
+    setTimeout(requestUpload, 4000);
   }
   function step() {
     if (offset >= snapshot.length) {
@@ -182,7 +184,7 @@ Pebble.addEventListener('appmessage', function(e) {
 
   if (command === UPLOAD_BEGIN) {
     var expected = Number(field(payload, 'SYNC_COUNT', 72));
-    if (!Number.isFinite(expected) || expected < 0 || expected > 180 ||
+    if (!isFinite(expected) || expected < 0 || expected > 180 ||
         Math.floor(expected) !== expected) return;
     upload = { expected: expected, records: [] };
     return;
