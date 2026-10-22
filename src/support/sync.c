@@ -87,6 +87,7 @@ static bool send_upload_packet(uint8_t command) {
                         bytes, n * SYNC_BYTES_PER_RECORD) != DICT_OK)
       return false;
   }
+  dict_write_end(dict);
   return app_message_outbox_send() == APP_MSG_OK;
 }
 
