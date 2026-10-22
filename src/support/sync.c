@@ -22,6 +22,7 @@ static bool s_upload_active;
 static bool s_download_active;
 static bool s_download_complete;
 static bool s_upload_pending;
+static bool s_awaiting_download;
 static uint8_t s_upload_phase;
 static int s_upload_offset;
 static int s_upload_total;
@@ -91,7 +92,7 @@ static bool send_upload_packet(uint8_t command) {
 
 static void begin_upload(void) {
   if (!s_phone_ready || s_upload_active || s_download_active ||
-      s_download_complete || s_editor_open) return;
+      s_awaiting_download || s_download_complete || s_editor_open) return;
   s_upload_total = sync_record_count();
   if (s_upload_total < 0 || s_upload_total > SYNC_WATCH_RECORD_LIMIT) return;
   for (int i = 0; i < s_upload_total; ++i)
@@ -119,6 +120,7 @@ static void outbox_sent(DictionaryIterator *iter, void *context) {
   if (s_upload_phase == SYNC_UPLOAD_END) {
     s_upload_active = false;
     s_upload_phase = 0;
+    s_awaiting_download = true;
     // The phone responds with a complete merged download. Do not
     // upload again until that response is applied.
     return;
@@ -178,6 +180,7 @@ void sync_on_inbox(DictionaryIterator *iter) {
   int command = command_tuple->value->int32;
   if (command == SYNC_START) {
     s_phone_ready = true;
+    s_awaiting_download = false;
     s_retry_attempts = 0;
     if (s_retry_timer) { app_timer_cancel(s_retry_timer); s_retry_timer = NULL; }
     s_upload_pending = true;
@@ -192,6 +195,7 @@ void sync_on_inbox(DictionaryIterator *iter) {
     if (!t) return;
     int count = t->value->int32;
     if (count < 0 || count > SYNC_WATCH_RECORD_LIMIT) return;
+    s_awaiting_download = false;
     s_download_expected = count;
     s_download_count = 0;
     s_download_active = true;
@@ -250,6 +254,7 @@ void sync_init(void) {
   s_upload_pending = false;
   s_download_active = false;
   s_download_complete = false;
+  s_awaiting_download = false;
   s_retry_timer = NULL;
   s_retry_attempts = 0;
   app_message_register_outbox_sent(outbox_sent);
