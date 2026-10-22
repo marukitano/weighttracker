@@ -121,6 +121,7 @@ static void outbox_sent(DictionaryIterator *iter, void *context) {
   if (s_upload_phase == SYNC_UPLOAD_END) {
     s_upload_active = false;
     s_upload_phase = 0;
+    s_retry_attempts = 0;
     // The phone responds with a complete merged download. Do not
     // upload again until that response is applied.
     return;
