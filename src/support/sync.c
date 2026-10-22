@@ -121,7 +121,6 @@ static void outbox_sent(DictionaryIterator *iter, void *context) {
   if (s_upload_phase == SYNC_UPLOAD_END) {
     s_upload_active = false;
     s_upload_phase = 0;
-    s_awaiting_download = true;
     // The phone responds with a complete merged download. Do not
     // upload again until that response is applied.
     return;
@@ -132,7 +131,11 @@ static void outbox_sent(DictionaryIterator *iter, void *context) {
     s_upload_offset += SYNC_CHUNK_RECORDS;
     if (s_upload_offset >= s_upload_total) s_upload_phase = SYNC_UPLOAD_END;
   }
+  // Mark the expected phone response BEFORE sending END: the phone
+  // can begin its download before this outbound ACK callback returns.
+  if (s_upload_phase == SYNC_UPLOAD_END) s_awaiting_download = true;
   if (!send_upload_packet(s_upload_phase)) {
+    s_awaiting_download = false;
     s_upload_active = false;
     s_upload_pending = true;
     schedule_retry();
@@ -172,7 +175,8 @@ static void apply_download(void) {
     sync_finish_remote_merge();
     weighttracker_sync_refresh();
   }
-  if (s_upload_pending) begin_upload();
+  // Defer a second upload until any outstanding outbox ACK has settled.
+  if (s_upload_pending) schedule_retry();
 }
 
 void sync_on_inbox(DictionaryIterator *iter) {
@@ -244,7 +248,7 @@ void sync_set_editor_open(bool editor_open) {
   if (!editor_open) {
     apply_download();
     if (s_upload_pending && !s_download_active && !s_download_complete)
-      begin_upload();
+      schedule_retry();
   }
 }
 
