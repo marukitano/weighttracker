@@ -64,9 +64,16 @@ pebble install --phone PHONE_IP_ADDRESS
 
 Replace `PHONE_IP_ADDRESS` with the address of your phone's Pebble connection. The project currently targets `emery` only.
 
-### Data and export
+### Data, phone sync and export
 
-Measurements are stored locally by the watch app. **CSV/Excel export is not currently available.** The export feature has been deferred.
+- Measurements remain available **offline on each watch** (up to 100 entries).
+- Starting WeightTracker with a connected phone exchanges and merges measurement history with the Pebble companion app. This lets **two Pebble Time 2 watches paired to the same phone** share their history.
+- New entries, edits and deletions are synchronized using stable IDs and deletion markers, so an offline watch does not simply overwrite the other one's records.
+- The phone retains the shared history in the Pebble app's **localStorage**. No external account, network connection or cloud server is required.
+- For a first-time migration, start WeightTracker on watch A with the phone connected, let the exchange complete, then switch watches and open WeightTracker on watch B. Repeat once to ensure both have the merged records.
+- The phone's localStorage is **not a permanent backup**: resetting/uninstalling the companion app or changing phones may erase that copy. Keep the original watch data intact until you have verified the first transfer.
+
+**CSV/Excel export is not currently available.**
 
 ### Credits and licence
 
@@ -135,9 +142,16 @@ pebble install --phone PHONE_IP_ADDRESS
 
 Ersetze `PHONE_IP_ADDRESS` durch die Adresse der Pebble-Verbindung auf deinem Natel. Aktuell unterstützt das Projekt als Zielplattform nur `emery`.
 
-### Daten und Export
+### Daten, Smartphone-Abgleich und Export
 
-Die Messwerte werden lokal von der App auf der Uhr gespeichert. Ein **CSV-/Excel-Export ist derzeit nicht verfügbar** und wurde vorerst zurückgestellt.
+- Jede Uhr speichert weiterhin **bis zu 100 Messungen lokal** und funktioniert ohne Smartphone.
+- Beim Start mit verbundenem Smartphone werden die Messwerte mit dem lokalen Speicher der Pebble-Begleit-App abgeglichen. So teilen sich **zwei Pebble Time 2 am selben Smartphone** einen gemeinsamen Gewichtsverlauf.
+- Neue, geänderte und gelöschte Einträge werden anhand eindeutiger IDs abgeglichen. Eine Uhr, die länger offline war, soll keine bereits gelöschten Messungen wiederherstellen.
+- Die Smartphone-Kopie liegt im **localStorage** der Begleit-App, ohne Cloud, Internetverbindung oder zusätzliches Benutzerkonto.
+- Beim ersten Umstieg WeightTracker mit Uhr A und verbundenem Smartphone starten, den Abgleich abschliessen lassen, dann auf Uhr B wechseln und WeightTracker dort öffnen. Anschliessend einmal zurückwechseln.
+- Achtung: Der lokale Smartphone-Speicher ist **kein dauerhaftes Backup**. Bei einer Neuinstallation der Begleit-App oder einem Telefonwechsel kann die Kopie verloren gehen. Bestehende Uhrendaten erst nach überprüftem Abgleich aufgeben.
+
+Ein **CSV-/Excel-Export ist derzeit nicht verfügbar**.
 
 ### Credits und Lizenz
 
