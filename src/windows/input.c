@@ -1,4 +1,5 @@
 #include <pebble.h>
+#include "../support/sync.h"
 #include "../support/config.h"
 #include "../support/utils.h"
 #include "../support/data.h"
@@ -435,6 +436,7 @@ static void on_disappear(Window *window) {
 #endif
 }
 static void on_unload(Window *window) {
+  sync_set_editor_open(false);
   on_disappear(window);
   if (s_button_intro_timer) { app_timer_cancel(s_button_intro_timer); s_button_intro_timer = NULL; }
   if (s_button_bounce_timer) { app_timer_cancel(s_button_bounce_timer); s_button_bounce_timer = NULL; }
@@ -449,6 +451,7 @@ static void on_unload(Window *window) {
 }
 
 static void open_editor(int edit_offset) {
+  sync_set_editor_open(true);
   s_edit_offset = edit_offset;
   s_drag_pixels = 0;
   s_roll_offset = 0;
