@@ -46,6 +46,22 @@
     "type": "section",
     "items": [
       {
+        "type": "select",
+        "messageKey": "DARK_MODE",
+        "label": "Display theme",
+        "defaultValue": "0",
+        "options": [
+          {
+            "label": "Light — white background",
+            "value": "0"
+          },
+          {
+            "label": "Dark — black background",
+            "value": "1"
+          }
+        ]
+      },
+      {
         "type": "heading",
         "defaultValue": "Chart"
       },
