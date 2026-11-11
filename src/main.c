@@ -104,9 +104,9 @@ static void button_marker_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   const int center_y[3] = {36, bounds.size.h / 2, bounds.size.h - 36};
   const int edge_x = bounds.size.w;
-  // No rail or divider: paint only black button tabs and symbols.
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_context_set_stroke_color(ctx, GColorBlack);
+  // No rail or divider: invert tabs and symbols with the canvas.
+  graphics_context_set_fill_color(ctx, chart_prefs_foreground_color());
+  graphics_context_set_stroke_color(ctx, chart_prefs_foreground_color());
   graphics_context_set_stroke_width(ctx, 2);
 
   for (int i = 0; i < 3; ++i) {
@@ -186,14 +186,14 @@ static void back_marker_update(Layer *layer, GContext *ctx) {
   if (s_button_enter_x[0] >= 30) return;
   int shift = s_button_enter_x[0];
   int width = s_back_width + (shift > 0 ? shift : 0);
-  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_context_set_fill_color(ctx, chart_prefs_foreground_color());
   graphics_fill_rect(ctx, GRect(0, 10, width, 52), 5, GCornersRight);
-  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_stroke_color(ctx, chart_prefs_foreground_color());
   graphics_context_set_stroke_width(ctx, 2);
   int cx = 15 - shift, cy = 36;
   if (s_back_expanded) {
-    // White X replaces and covers the old left arrow within the extended tab.
-    graphics_context_set_stroke_color(ctx, GColorWhite);
+    // Inverted X overlays the expanded tab.
+    graphics_context_set_stroke_color(ctx, chart_prefs_background_color());
     graphics_draw_line(ctx, GPoint(13, cy - 7), GPoint(25, cy + 7));
     graphics_draw_line(ctx, GPoint(13, cy + 7), GPoint(25, cy - 7));
   } else {
@@ -254,7 +254,7 @@ static void draw_outlined_weight(GContext *ctx, const char *label, GFont font,
     }
     graphics_release_frame_buffer(ctx, framebuffer);
   }
-  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_context_set_text_color(ctx, chart_prefs_foreground_color());
   graphics_draw_text(ctx, label, font, rect,
                      GTextOverflowModeTrailingEllipsis,
                      GTextAlignmentCenter, NULL);
@@ -343,7 +343,7 @@ static void change_history(int direction) {
 
 static void initialise_ui(void) {
   s_window = window_create();
-  window_set_background_color(s_window, GColorWhite);
+  window_set_background_color(s_window, chart_prefs_background_color());
   Layer *window_layer = window_get_root_layer(s_window);
   GRect bounds = layer_get_frame(window_layer);
 
@@ -365,7 +365,7 @@ static void initialise_ui(void) {
   s_textlayer_1 = text_layer_create(GRect(0, bounds.size.h - PBL_IF_ROUND_ELSE(38, 20), bounds.size.w, PBL_IF_ROUND_ELSE(38, 24)));
 #endif
   text_layer_set_background_color(s_textlayer_1, GColorClear);
-  text_layer_set_text_color(s_textlayer_1, GColorBlack);
+  text_layer_set_text_color(s_textlayer_1, chart_prefs_foreground_color());
   text_layer_set_text_alignment(s_textlayer_1, GTextAlignmentCenter);
   text_layer_set_font(s_textlayer_1, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
   // Clip the old/new animated weights to the caption area.
@@ -600,6 +600,12 @@ static void config_received(DictionaryIterator *iter, void *context) {
     tuple = dict_read_next(iter);
   }
   if (!chart_prefs_apply(iter)) return;
+  // Clay can change the theme while the main window is already open.
+  if (s_window) window_set_background_color(s_window, chart_prefs_background_color());
+  if (s_textlayer_1)
+    text_layer_set_text_color(s_textlayer_1, chart_prefs_foreground_color());
+  if (s_button_marker) layer_mark_dirty(s_button_marker);
+  if (s_back_marker) layer_mark_dirty(s_back_marker);
   s_history_offset = 0;
   s_incoming_offset = 0;
   s_slide_running = false;
