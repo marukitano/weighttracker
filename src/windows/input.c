@@ -1,4 +1,5 @@
 #include <pebble.h>
+#include "../support/chart_prefs.h"
 #include "../support/sync.h"
 #include "../support/config.h"
 #include "../support/utils.h"
@@ -174,7 +175,7 @@ static void draw_pixel_weight(GContext *ctx, const char *value, int width) {
   }
   int x = (width - pixels * scale) / 2;
   const int y = 9;
-  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_context_set_fill_color(ctx, chart_prefs_foreground_color());
   for (int c = 0; c < count; ++c) {
     int glyph = value[c] == '.' ? 10 : value[c] - '0';
     if (glyph < 0 || glyph > 10) continue;
@@ -263,9 +264,9 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
   const int ruler_x = 0;
   const int readout_y = 23;  // Center of 5x7 pixel digits at y=9, scale 4.
   int cy = bounds.size.h / 2;
-  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_context_set_fill_color(ctx, chart_prefs_background_color());
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_context_set_text_color(ctx, chart_prefs_foreground_color());
 
   // The marker stays still while the ruler ticks roll beneath it.
   for (int step = -22; step <= 22; ++step) {
@@ -276,7 +277,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     // 0.1: short thin tick; 0.5: medium thick; 1.0: twice the 0.5 length.
     bool whole = value % 10 == 0;
     bool half = value % 5 == 0;
-    graphics_context_set_stroke_color(ctx, GColorBlack);
+    graphics_context_set_stroke_color(ctx, chart_prefs_foreground_color());
     graphics_context_set_stroke_width(ctx, half ? 2 : 1);
     graphics_draw_line(ctx, GPoint(ruler_x, y),
                        GPoint(ruler_x + (whole ? 32 : half ? 16 : 9), y));
@@ -299,11 +300,11 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     const int middle_width = s_button_width[0] + (shift > 0 ? shift : 0);
     const int bottom_width = s_button_width[1] + (shift > 0 ? shift : 0);
     if (s_edit_offset >= 0) {
-      graphics_context_set_fill_color(ctx, GColorBlack);
+      graphics_context_set_fill_color(ctx, chart_prefs_foreground_color());
       graphics_fill_rect(ctx,
         GRect(edge_x - middle_width, center_y - 26, middle_width, 52),
         5, GCornersLeft);
-      graphics_context_set_stroke_color(ctx, GColorBlack);
+      graphics_context_set_stroke_color(ctx, chart_prefs_foreground_color());
       graphics_context_set_stroke_width(ctx, 2);
       graphics_draw_line(ctx, GPoint(edge_x - 23 + shift, center_y),
                          GPoint(edge_x - 18 + shift, center_y + 5));
@@ -312,7 +313,7 @@ static void draw_canvas(Layer *layer, GContext *ctx) {
     }
 
     // New: bottom check/save. Edit: bottom red X, hold for 3 seconds.
-    GColor action_color = s_edit_offset >= 0 ? GColorRed : GColorBlack;
+    GColor action_color = s_edit_offset >= 0 ? GColorRed : chart_prefs_foreground_color();
     graphics_context_set_fill_color(ctx, action_color);
     graphics_fill_rect(ctx,
       GRect(edge_x - bottom_width, bottom_y - 26, bottom_width, 52),
@@ -468,7 +469,7 @@ static void open_editor(int edit_offset) {
   double current_unit = to_current_unit(initial);
   s_tenths = clamp_value((int)(current_unit * 10 + 0.5));
   s_window = window_create();
-  window_set_background_color(s_window, GColorWhite);
+  window_set_background_color(s_window, chart_prefs_background_color());
   Layer *root = window_get_root_layer(s_window);
   s_canvas = layer_create(layer_get_bounds(root));
   layer_set_update_proc(s_canvas, draw_canvas);
