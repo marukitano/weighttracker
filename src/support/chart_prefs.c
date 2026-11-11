@@ -11,10 +11,19 @@
 #define KEY_UNIT 64
 #define KEY_ABOVE 65
 #define KEY_BELOW 66
+#define KEY_DARK_MODE 67
 #define MIN_RANGE 4
 #define MAX_RANGE 30
 
 static int s_height_cm;
+static bool s_dark_mode;
+bool chart_prefs_dark_mode(void) { return s_dark_mode; }
+GColor chart_prefs_background_color(void) {
+  return s_dark_mode ? GColorBlack : GColorWhite;
+}
+GColor chart_prefs_foreground_color(void) {
+  return s_dark_mode ? GColorWhite : GColorBlack;
+}
 static int s_color_mode;
 static int s_label_above;
 static int s_label_below;
@@ -39,6 +48,8 @@ GColor chart_prefs_line_color(void) {
   }
 }
 void chart_prefs_load(void) {
+  s_dark_mode = persist_exists(KEY_DARK_MODE) &&
+                persist_read_int(KEY_DARK_MODE) == 1;
   s_label_above = persist_exists(KEY_ABOVE) ? persist_read_int(KEY_ABOVE) : 1;
   s_label_below = persist_exists(KEY_BELOW) ? persist_read_int(KEY_BELOW) : 0;
   if (s_label_above < 0 || s_label_above > 2) s_label_above = 1;
@@ -55,6 +66,14 @@ static int as_int(Tuple *t) {
 bool chart_prefs_apply(DictionaryIterator *iter) {
   bool changed = false;
   Tuple *t;
+  if ((t = dict_find(iter, KEY_DARK_MODE))) {
+    int value = as_int(t);
+    if (value == 0 || value == 1) {
+      s_dark_mode = value == 1;
+      persist_write_int(KEY_DARK_MODE, value);
+      changed = true;
+    }
+  }
   if ((t = dict_find(iter, KEY_HEIGHT))) {
     int value = as_int(t);
     if (value >= 0 && value <= 230) {
