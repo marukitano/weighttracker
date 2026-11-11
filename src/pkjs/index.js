@@ -20,11 +20,13 @@ Pebble.addEventListener('webviewclosed', function(event) {
     } catch (error) {
       raw = typeof event.response === 'object' ? event.response : {};
     }
-    ['LABEL_ABOVE', 'LABEL_BELOW'].forEach(function(key, index) {
+    var fallbackKeys = {LABEL_ABOVE: 65, LABEL_BELOW: 66, DARK_MODE: 67};
+    Object.keys(fallbackKeys).forEach(function(key) {
       var value = raw[key];
       if (value && typeof value === 'object') value = value.value;
       if (value !== undefined && value !== null) {
-        settings[index === 0 ? 65 : 66] = parseInt(value, 10);
+        var parsed = parseInt(value, 10);
+        if (!isNaN(parsed)) settings[fallbackKeys[key]] = parsed;
       }
     });
     // Clay can create a spurious "NaN" entry for a custom select field.
