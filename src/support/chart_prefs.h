@@ -1,5 +1,9 @@
 #pragma once
 #include <pebble.h>
+// Shared palette for chart, controls and weight editor.
+bool chart_prefs_dark_mode(void);
+GColor chart_prefs_background_color(void);
+GColor chart_prefs_foreground_color(void);
 void chart_prefs_load(void);
 bool chart_prefs_apply(DictionaryIterator *iter);
 int chart_prefs_height_cm(void);
