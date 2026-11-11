@@ -16,6 +16,7 @@ This project adapts the original **WeightTracker** by **Viktor Csala** for the P
 
 - **On-watch weight tracking:** add, review, edit, and delete measurements.
 - **Interactive weight chart:** smooth curve, centered selection marker, and animated button tabs.
+- **Optional dark mode:** black background and white digits, labels and controls; the red weight curve stays red. Change it under **Display theme** in the Pebble app settings (light mode remains the default).
 - **Two horizontal-axis modes:** evenly spaced measurements or calendar days.
 - **Configurable chart range:** 4–30 previous measurements or days to the left of the selected point (subject to available history).
 - **Customisable labels:** independently choose **date**, **weight**, or **BMI** above and below the selected point.
@@ -94,6 +95,7 @@ Dieses Projekt ist eine Anpassung der ursprünglichen App **WeightTracker** von 
 
 - **Gewicht direkt auf der Uhr verwalten:** Messwerte hinzufügen, ansehen, bearbeiten und löschen.
 - **Interaktives Diagramm:** geglättete Gewichtskurve, mittiger Auswahlpunkt und animierte Tastenmarkierungen.
+- **Optionaler Dunkelmodus:** schwarzer Hintergrund, weisse Zahlen, Beschriftungen und Symbole. Die rote Gewichtskurve bleibt rot. Unter **Display theme** in den Pebble-Einstellungen auswählbar (standardmässig hell).
 - **Zwei Modi für die horizontale Achse:** gleichmässig verteilte Messungen oder Kalendertage.
 - **Einstellbarer Diagrammbereich:** 4–30 ältere Messungen oder Tage links vom ausgewählten Punkt (soweit vorhanden).
 - **Frei wählbare Beschriftung:** oberhalb und unterhalb des Punkts unabhängig **Datum**, **Gewicht** oder **BMI** anzeigen.
@@ -120,6 +122,8 @@ Dieses Projekt ist eine Anpassung der ursprünglichen App **WeightTracker** von 
 ### Einstellungen auf dem Natel
 
 Öffne **WeightTracker → Einstellungen** in der Pebble-App:
+
+- Unter **Display theme** zwischen **Light** und **Dark** umschalten.
 
 - Gewichtseinheit kg, lb oder st auswählen.
 - Körpergrösse in Zentimetern eintragen, wenn du den BMI anzeigen möchtest.
