@@ -211,7 +211,7 @@ static void draw_clockwise_label(GContext *ctx, const char *label,
   if (y0 + total > display_height) y0 = display_height - total;
   if (y0 < 0) y0 = 0;
   int x0 = center_x - (7 * scale) / 2;
-  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_context_set_fill_color(ctx, chart_prefs_foreground_color());
   int cursor = 0;
   for (int c = 0; c < count; ++c) {
     const uint8_t *glyph = ROTATED_GLYPHS[vertical_glyph_index(label[c])];
@@ -373,9 +373,9 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
     points[i].y = chart_y(values[i], min_weight, max_weight, top, height);
   }
 
-  // White canvas, no area fill. Only the smoothed weight line is drawn
+  // Theme canvas, no area fill. Only the smoothed weight line is drawn
   // within the middle third of the display.
-  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_context_set_fill_color(ctx, chart_prefs_background_color());
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   int segment = 0;
   int previous_y = points[0].y;
@@ -405,6 +405,6 @@ void draw_chart_callback(Layer *layer, GContext *ctx) {
   }
   graphics_context_set_fill_color(ctx, GColorRed);
   graphics_fill_circle(ctx, marker, 8);
-  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_context_set_fill_color(ctx, chart_prefs_background_color());
   graphics_fill_circle(ctx, marker, 4);
 }
